@@ -112,9 +112,12 @@ create trigger on_task_updated
   for each row execute function public.handle_task_update();
 
 -- Log every status change into history.
+-- SECURITY DEFINER so the trigger can write to task_status_history, which has RLS
+-- enabled with no client-facing INSERT policy (history is written only by this trigger).
 create or replace function public.log_status_change()
 returns trigger
 language plpgsql
+security definer set search_path = public
 as $$
 begin
   if (tg_op = 'INSERT') then

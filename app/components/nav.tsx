@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { ThemeToggle } from "./theme-toggle";
 import type { Profile } from "@/lib/types";
 
-const LINKS = [
+const BASE_LINKS = [
   { href: "/board", label: "Board" },
   { href: "/tasks", label: "Tasks" },
   { href: "/people", label: "People" },
@@ -13,6 +13,10 @@ const LINKS = [
 
 export function Nav({ profile }: { profile: Profile }) {
   const pathname = usePathname();
+  const links =
+    profile.role === "admin"
+      ? [...BASE_LINKS, { href: "/admin", label: "Admin" }]
+      : BASE_LINKS;
 
   return (
     <header className="sticky top-0 z-20 border-b border-border bg-bg/80 backdrop-blur">
@@ -25,7 +29,7 @@ export function Nav({ profile }: { profile: Profile }) {
         </Link>
 
         <nav className="ml-2 flex items-center gap-1">
-          {LINKS.map((l) => {
+          {links.map((l) => {
             const active = pathname === l.href || pathname.startsWith(l.href + "/");
             return (
               <Link

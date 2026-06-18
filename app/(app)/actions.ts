@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { notifyStatusChange } from "@/lib/slack";
 import type { Status } from "@/lib/types";
 
@@ -35,6 +35,20 @@ function str(v: FormDataEntryValue | null): string | null {
   return s === "" ? null : s;
 }
 
+// Dedupe + clean the tags submitted from the form.
+function parseTags(formData: FormData): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const v of formData.getAll("tags")) {
+    const s = v.toString().trim();
+    if (s && !seen.has(s.toLowerCase())) {
+      seen.add(s.toLowerCase());
+      out.push(s);
+    }
+  }
+  return out;
+}
+
 async function syncStakeholders(taskId: string, ids: string[]) {
   const supabase = createClient();
   await supabase.from("task_stakeholders").delete().eq("task_id", taskId);
@@ -63,6 +77,7 @@ export async function createTask(formData: FormData) {
       priority: str(formData.get("priority")) ?? "Medium",
       assignee_id: str(formData.get("assignee_id")),
       delivered_date: str(formData.get("delivered_date")),
+      tags: parseTags(formData),
       created_by: me.id,
     })
     .select("id, title, status")
@@ -110,6 +125,7 @@ export async function updateTask(taskId: string, formData: FormData) {
       priority: str(formData.get("priority")) ?? "Medium",
       assignee_id: str(formData.get("assignee_id")),
       delivered_date: str(formData.get("delivered_date")),
+      tags: parseTags(formData),
     })
     .eq("id", taskId);
 
@@ -176,4 +192,50 @@ export async function deleteTask(taskId: string) {
   revalidatePath("/board");
   revalidatePath("/tasks");
   revalidatePath("/people");
+}
+
+// ----------------------------------------------------------------
+//  Admin actions — user management. Guarded server-side: the caller
+//  must be an admin, regardless of what the UI shows.
+// ----------------------------------------------------------------
+async function requireAdmin() {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+  const { data } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+  if (data?.role !== "admin") throw new Error("Admins only");
+  return user.id;
+}
+
+export async function deleteUser(userId: string) {
+  const adminId = await requireAdmin();
+  if (userId === adminId) throw new Error("You can't delete your own account here.");
+
+  // Removing the auth user cascades to their profile; their tasks stay but
+  // become unassigned (assignee/created_by are set to null by the DB).
+  const admin = createAdminClient();
+  const { error } = await admin.auth.admin.deleteUser(userId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/admin");
+  revalidatePath("/people");
+  revalidatePath("/board");
+  revalidatePath("/tasks");
+}
+
+export async function setUserRole(userId: string, role: "member" | "admin") {
+  const adminId = await requireAdmin();
+  if (userId === adminId && role !== "admin") {
+    throw new Error("You can't remove your own admin access.");
+  }
+  const admin = createAdminClient();
+  const { error } = await admin.from("profiles").update({ role }).eq("id", userId);
+  if (error) throw new Error(error.message);
+  revalidatePath("/admin");
 }

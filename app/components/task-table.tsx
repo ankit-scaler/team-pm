@@ -18,11 +18,22 @@ function isOverdue(t: Task) {
 
 const selCls = "rounded-lg border border-border bg-surface px-2.5 py-1.5 text-sm outline-none";
 
-export function TaskTable({ tasks, people }: { tasks: Task[]; people: Profile[] }) {
+export function TaskTable({
+  tasks,
+  people,
+  allTags = [],
+}: {
+  tasks: Task[];
+  people: Profile[];
+  allTags?: string[];
+}) {
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("");
   const [assignee, setAssignee] = useState("");
   const [priority, setPriority] = useState("");
+  const [tag, setTag] = useState("");
+  const [etaFrom, setEtaFrom] = useState("");
+  const [etaTo, setEtaTo] = useState("");
 
   const filtered = useMemo(() => {
     return tasks.filter((t) => {
@@ -30,24 +41,36 @@ export function TaskTable({ tasks, people }: { tasks: Task[]; people: Profile[] 
       if (priority && t.priority !== priority) return false;
       if (assignee === "unassigned" ? t.assignee_id : assignee && t.assignee_id !== assignee)
         return false;
+      if (tag && !t.tags.includes(tag)) return false;
+      if (etaFrom && (!t.eta || t.eta < etaFrom)) return false;
+      if (etaTo && (!t.eta || t.eta > etaTo)) return false;
       if (q && !t.title.toLowerCase().includes(q.toLowerCase())) return false;
       return true;
     });
-  }, [tasks, q, status, assignee, priority]);
+  }, [tasks, q, status, assignee, priority, tag, etaFrom, etaTo]);
+
+  const anyFilter = q || status || assignee || priority || tag || etaFrom || etaTo;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search tasks…"
-          className="min-w-[180px] flex-1 rounded-lg border border-border bg-surface px-3 py-1.5 text-sm outline-none focus:border-accent"
+          className="min-w-[160px] flex-1 rounded-lg border border-border bg-surface px-3 py-1.5 text-sm outline-none focus:border-accent"
         />
         <select value={status} onChange={(e) => setStatus(e.target.value)} className={selCls}>
-          <option value="">All statuses</option>
+          <option value="">All stages</option>
           {STATUSES.map((s) => (
             <option key={s} value={s}>{s}</option>
+          ))}
+        </select>
+        <select value={assignee} onChange={(e) => setAssignee(e.target.value)} className={selCls}>
+          <option value="">Anyone</option>
+          <option value="unassigned">Unassigned</option>
+          {people.map((p) => (
+            <option key={p.id} value={p.id}>{p.email}</option>
           ))}
         </select>
         <select value={priority} onChange={(e) => setPriority(e.target.value)} className={selCls}>
@@ -56,13 +79,33 @@ export function TaskTable({ tasks, people }: { tasks: Task[]; people: Profile[] 
             <option key={p} value={p}>{p}</option>
           ))}
         </select>
-        <select value={assignee} onChange={(e) => setAssignee(e.target.value)} className={selCls}>
-          <option value="">Anyone</option>
-          <option value="unassigned">Unassigned</option>
-          {people.map((p) => (
-            <option key={p.id} value={p.id}>{p.full_name ?? p.email}</option>
-          ))}
-        </select>
+        {allTags.length > 0 && (
+          <select value={tag} onChange={(e) => setTag(e.target.value)} className={selCls}>
+            <option value="">All tags</option>
+            {allTags.map((t) => (
+              <option key={t} value={t}>#{t}</option>
+            ))}
+          </select>
+        )}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <span className="text-muted">ETA between</span>
+        <input type="date" value={etaFrom} onChange={(e) => setEtaFrom(e.target.value)} className={selCls} />
+        <span className="text-muted">and</span>
+        <input type="date" value={etaTo} onChange={(e) => setEtaTo(e.target.value)} className={selCls} />
+        {anyFilter && (
+          <button
+            type="button"
+            onClick={() => {
+              setQ(""); setStatus(""); setAssignee(""); setPriority(""); setTag(""); setEtaFrom(""); setEtaTo("");
+            }}
+            className="text-xs text-accent hover:underline"
+          >
+            Clear filters
+          </button>
+        )}
+        <span className="ml-auto text-xs text-muted">{filtered.length} of {tasks.length}</span>
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-border bg-surface">
@@ -70,7 +113,7 @@ export function TaskTable({ tasks, people }: { tasks: Task[]; people: Profile[] 
           <thead className="border-b border-border text-xs uppercase tracking-wide text-muted">
             <tr>
               <th className="px-4 py-2.5 font-medium">Task</th>
-              <th className="px-4 py-2.5 font-medium">Status</th>
+              <th className="px-4 py-2.5 font-medium">Stage</th>
               <th className="px-4 py-2.5 font-medium">Assignee</th>
               <th className="px-4 py-2.5 font-medium">Priority</th>
               <th className="px-4 py-2.5 font-medium">Effort</th>
@@ -83,7 +126,7 @@ export function TaskTable({ tasks, people }: { tasks: Task[]; people: Profile[] 
             {filtered.length === 0 && (
               <tr>
                 <td colSpan={8} className="px-4 py-10 text-center text-muted">
-                  No tasks match these filters. Create one to get started.
+                  No tasks match these filters.
                 </td>
               </tr>
             )}
@@ -91,6 +134,15 @@ export function TaskTable({ tasks, people }: { tasks: Task[]; people: Profile[] 
               <tr key={t.id} className="border-b border-border last:border-0 hover:bg-bg/60">
                 <td className="max-w-xs px-4 py-3">
                   <div className="font-medium">{t.title}</div>
+                  {t.tags.length > 0 && (
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {t.tags.map((tg) => (
+                        <span key={tg} className="rounded-full bg-violet-100 px-1.5 py-0.5 text-[11px] text-violet-700 dark:bg-violet-950 dark:text-violet-300">
+                          #{tg}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                   {t.stakeholders && t.stakeholders.length > 0 && (
                     <div className="mt-0.5 truncate text-xs text-muted">
                       {t.stakeholders.map((s) => s.full_name ?? s.email).join(", ")}
@@ -100,7 +152,7 @@ export function TaskTable({ tasks, people }: { tasks: Task[]; people: Profile[] 
                 <td className="px-4 py-3"><StatusBadge status={t.status} /></td>
                 <td className="px-4 py-3">
                   {t.assignee ? (
-                    <span className="text-sm">{t.assignee.full_name ?? t.assignee.email}</span>
+                    <span className="text-sm" title={t.assignee.email}>{t.assignee.full_name ?? t.assignee.email}</span>
                   ) : (
                     <span className="text-xs text-muted">Unassigned</span>
                   )}
@@ -113,7 +165,7 @@ export function TaskTable({ tasks, people }: { tasks: Task[]; people: Profile[] 
                 </td>
                 <td className="px-4 py-3 text-muted">{fmt(t.delivered_date)}</td>
                 <td className="px-4 py-3 text-right">
-                  <TaskForm people={people} task={t} />
+                  <TaskForm people={people} task={t} allTags={allTags} />
                 </td>
               </tr>
             ))}

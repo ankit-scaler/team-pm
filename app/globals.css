@@ -45,3 +45,15 @@ input,
 textarea {
   color-scheme: light dark;
 }
+
+/* Make the date field's calendar icon obvious and tappable (and visible in dark mode) */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.7;
+}
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+.dark input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.8);
+}

@@ -88,3 +88,18 @@ The `role` column is ready if you later want to gate destructive actions to admi
 - **Rejected at login** → the email domain isn't listed in `ALLOWED_EMAIL_DOMAINS`.
 - **No Slack message** → check `SLACK_WEBHOOK_URL`; notifications only fire when the status actually changes.
 - **Project paused** → the keep-alive cron hasn't run yet; visit the app once or trigger `/api/keepalive`.
+
+---
+
+## Update v2 — what changed
+
+This version adds: an **Admin tab** (user management), **delete/remove user**, **role promotion**, **tags** on tasks (autocomplete existing + create new), and richer **filters** (by stage, person/email, tag, and ETA date range on the Tasks page; by person/email + date range on the People page). Slack already notified on status changes and **also fires when a task is added** — the message wording is now clearer for each case.
+
+### To apply this update
+1. **Run the migration:** Supabase → SQL Editor → paste [`supabase/migration_v2.sql`](supabase/migration_v2.sql). **Edit the last line first** to use your real login email so you become an admin:
+   ```sql
+   update public.profiles set role = 'admin' where email = 'you@yourcompany.com';
+   ```
+   (You must have signed in at least once so your profile row exists.)
+2. **Redeploy:** commit and push these files; Vercel auto-deploys. No new environment variables are needed — `SUPABASE_SERVICE_ROLE_KEY` (already set) powers the admin user-management actions.
+3. Reload the app. The **Admin** tab appears for admins only. Removing a user there deletes their login + profile; their tasks remain but become unassigned.

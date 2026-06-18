@@ -30,9 +30,17 @@ export async function getTasks(): Promise<Task[]> {
 
   return (data ?? []).map((row: any) => ({
     ...row,
+    tags: row.tags ?? [],
     assignee: row.assignee ?? null,
     stakeholders: (row.task_stakeholders ?? [])
       .map((s: any) => s.profile)
       .filter(Boolean),
   })) as Task[];
+}
+
+// Distinct tags already used across all tasks — powers tag autocomplete.
+export function distinctTags(tasks: Task[]): string[] {
+  return Array.from(new Set(tasks.flatMap((t) => t.tags ?? []))).sort((a, b) =>
+    a.localeCompare(b)
+  );
 }

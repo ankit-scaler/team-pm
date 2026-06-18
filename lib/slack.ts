@@ -22,11 +22,10 @@ export async function notifyStatusChange(p: StatusChangePayload): Promise<void> 
   if (!webhook) return;
 
   const link = p.appUrl ? `${p.appUrl}/tasks` : undefined;
-  const transition = p.oldStatus
-    ? `*${p.oldStatus}* → *${p.newStatus}*`
-    : `created as *${p.newStatus}*`;
 
-  const text = `${STATUS_EMOJI[p.newStatus]} *${p.taskTitle}* ${transition} by ${p.actorName}`;
+  const text = p.oldStatus
+    ? `${STATUS_EMOJI[p.newStatus]} *${p.taskTitle}* moved *${p.oldStatus}* → *${p.newStatus}* by ${p.actorName}`
+    : `🆕 New task *${p.taskTitle}* added (status: *${p.newStatus}*) by ${p.actorName}`;
 
   try {
     await fetch(webhook, {

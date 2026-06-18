@@ -26,6 +26,7 @@ export type Task = {
   created_by: string | null;
   picked_date: string | null;
   delivered_date: string | null;
+  tags: string[];
   created_at: string;
   updated_at: string;
   assignee?: Profile | null;

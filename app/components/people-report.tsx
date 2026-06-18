@@ -14,9 +14,11 @@ const inDateRange = (d: string | null, from: string, to: string) => {
 export function PeopleReport({ tasks, people }: { tasks: Task[]; people: Profile[] }) {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [personId, setPersonId] = useState("");
 
   const rows = useMemo(() => {
     return people
+      .filter((p) => !personId || p.id === personId)
       .map((p) => {
         const mine = tasks.filter((t) => t.assignee_id === p.id);
         const picked = mine.filter((t) => inDateRange(t.picked_date, from, to)).length;
@@ -34,23 +36,34 @@ export function PeopleReport({ tasks, people }: { tasks: Task[]; people: Profile
       })
       .filter((r) => r.total > 0)
       .sort((a, b) => b.open - a.open || b.total - a.total);
-  }, [tasks, people, from, to]);
+  }, [tasks, people, from, to, personId]);
 
   const inputCls = "rounded-lg border border-border bg-surface px-2.5 py-1.5 text-sm outline-none";
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2 text-sm">
+        <select
+          value={personId}
+          onChange={(e) => setPersonId(e.target.value)}
+          className={inputCls}
+        >
+          <option value="">Everyone</option>
+          {people.map((p) => (
+            <option key={p.id} value={p.id}>{p.email}</option>
+          ))}
+        </select>
         <span className="text-muted">Count picked / closed between</span>
         <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={inputCls} />
         <span className="text-muted">and</span>
         <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className={inputCls} />
-        {(from || to) && (
+        {(from || to || personId) && (
           <button
             type="button"
             onClick={() => {
               setFrom("");
               setTo("");
+              setPersonId("");
             }}
             className="text-xs text-accent hover:underline"
           >

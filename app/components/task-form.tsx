@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { Pencil, Plus, Trash2, X } from "lucide-react";
 import { createTask, updateTask, deleteTask } from "../(app)/actions";
 import { StakeholderSelect } from "./stakeholder-select";
+import { TagSelect } from "./tag-select";
 import { STATUSES, EFFORTS, PRIORITIES, type Profile, type Task } from "@/lib/types";
 
 const fieldCls =
@@ -13,9 +14,11 @@ const labelCls = "mb-1 block text-xs font-medium text-muted";
 export function TaskForm({
   people,
   task,
+  allTags = [],
 }: {
   people: Profile[];
   task?: Task;
+  allTags?: string[];
 }) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -161,7 +164,13 @@ export function TaskForm({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className={labelCls}>ETA</label>
-                  <input type="date" name="eta" defaultValue={task?.eta ?? ""} className={fieldCls} />
+                  <input
+                    type="date"
+                    name="eta"
+                    defaultValue={task?.eta ?? ""}
+                    onClick={(e) => (e.currentTarget as any).showPicker?.()}
+                    className={`${fieldCls} cursor-pointer`}
+                  />
                 </div>
                 <div>
                   <label className={labelCls}>Delivered date</label>
@@ -169,7 +178,8 @@ export function TaskForm({
                     type="date"
                     name="delivered_date"
                     defaultValue={task?.delivered_date ?? ""}
-                    className={fieldCls}
+                    onClick={(e) => (e.currentTarget as any).showPicker?.()}
+                    className={`${fieldCls} cursor-pointer`}
                   />
                 </div>
               </div>
@@ -180,6 +190,11 @@ export function TaskForm({
                   people={people}
                   defaultSelectedIds={task?.stakeholders?.map((s) => s.id) ?? []}
                 />
+              </div>
+
+              <div>
+                <label className={labelCls}>Tags</label>
+                <TagSelect suggestions={allTags} defaultTags={task?.tags ?? []} />
               </div>
 
               {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
