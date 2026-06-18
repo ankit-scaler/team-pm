@@ -25,7 +25,7 @@ export function Nav({ profile }: { profile: Profile }) {
           <span className="grid h-7 w-7 place-items-center rounded-md bg-accent text-xs font-bold text-white">
             PM
           </span>
-          <span className="text-sm font-semibold tracking-tight">Team PM</span>
+          <span className="text-sm font-semibold tracking-tight">Instructor Team Task manager</span>
         </Link>
 
         <nav className="ml-2 flex items-center gap-1">
