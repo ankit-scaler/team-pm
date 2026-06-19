@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import type { Profile, Task } from "@/lib/types";
+import { DEFAULT_METRICS, type Profile, type Task } from "@/lib/types";
 
 const PROFILE_COLS = "id, email, full_name, avatar_url, role";
 
@@ -31,6 +31,7 @@ export async function getTasks(): Promise<Task[]> {
   return (data ?? []).map((row: any) => ({
     ...row,
     tags: row.tags ?? [],
+    metrics: row.metrics ?? [],
     assignee: row.assignee ?? null,
     stakeholders: (row.task_stakeholders ?? [])
       .map((s: any) => s.profile)
@@ -43,4 +44,10 @@ export function distinctTags(tasks: Task[]): string[] {
   return Array.from(new Set(tasks.flatMap((t) => t.tags ?? []))).sort((a, b) =>
     a.localeCompare(b)
   );
+}
+
+// Metric suggestions = the fixed starter list + anything custom anyone has used.
+export function distinctMetrics(tasks: Task[]): string[] {
+  const used = tasks.flatMap((t) => t.metrics ?? []);
+  return Array.from(new Set([...DEFAULT_METRICS, ...used]));
 }

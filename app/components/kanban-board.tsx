@@ -30,10 +30,12 @@ export function KanbanBoard({
   tasks,
   people,
   allTags = [],
+  allMetrics = [],
 }: {
   tasks: Task[];
   people: Profile[];
   allTags?: string[];
+  allMetrics?: string[];
 }) {
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -139,7 +141,7 @@ export function KanbanBoard({
                     <div className="flex items-start justify-between gap-2">
                       <h3 className="text-sm font-bold leading-snug text-fg">{t.title}</h3>
                       <div className="opacity-0 transition-opacity group-hover:opacity-100">
-                        <TaskForm people={people} task={t} allTags={allTags} />
+                        <TaskForm people={people} task={t} allTags={allTags} allMetrics={allMetrics} />
                       </div>
                     </div>
 
@@ -169,6 +171,19 @@ export function KanbanBoard({
                             className="rounded-full bg-violet-100 px-1.5 py-0.5 text-[11px] font-medium text-violet-700 dark:bg-violet-950 dark:text-violet-300"
                           >
                             #{tg}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {t.metrics.length > 0 && (
+                      <div className="mt-1.5 flex flex-wrap gap-1">
+                        {t.metrics.map((m) => (
+                          <span
+                            key={m}
+                            className="rounded-full bg-cyan-100 px-1.5 py-0.5 text-[11px] font-medium text-cyan-700 dark:bg-cyan-950 dark:text-cyan-300"
+                          >
+                            {m}
                           </span>
                         ))}
                       </div>

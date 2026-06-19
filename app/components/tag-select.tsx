@@ -3,14 +3,22 @@
 import { useMemo, useRef, useState } from "react";
 import { X, Plus } from "lucide-react";
 
-// Free-text tag picker. Suggests existing tags as you type and lets you create a
-// new one (Enter / comma / "Create" row). Emits hidden <input name="tags"> per tag.
+// Free-text multi-select. Suggests existing values as you type and lets you create a
+// new one (Enter / comma / "Create" row). Emits hidden <input name={fieldName}> per value.
 export function TagSelect({
   suggestions,
   defaultTags = [],
+  fieldName = "tags",
+  placeholder = "Add tags…",
+  chipClass = "bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300 hover:bg-violet-200/60 dark:hover:bg-violet-900",
+  prefix = "#",
 }: {
   suggestions: string[];
   defaultTags?: string[];
+  fieldName?: string;
+  placeholder?: string;
+  chipClass?: string;
+  prefix?: string;
 }) {
   const [selected, setSelected] = useState<string[]>(defaultTags);
   const [query, setQuery] = useState("");
@@ -54,20 +62,21 @@ export function TagSelect({
   return (
     <div className="relative">
       {selected.map((t) => (
-        <input key={t} type="hidden" name="tags" value={t} />
+        <input key={t} type="hidden" name={fieldName} value={t} />
       ))}
 
       <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-border bg-surface px-2 py-1.5">
         {selected.map((t) => (
           <span
             key={t}
-            className="inline-flex items-center gap-1 rounded-full bg-violet-100 py-0.5 pl-2 pr-1 text-xs text-violet-700 dark:bg-violet-950 dark:text-violet-300"
+            className={`inline-flex items-center gap-1 rounded-full py-0.5 pl-2 pr-1 text-xs ${chipClass}`}
           >
-            #{t}
+            {prefix}
+            {t}
             <button
               type="button"
               onClick={() => remove(t)}
-              className="grid h-4 w-4 place-items-center rounded-full hover:bg-violet-200/60 dark:hover:bg-violet-900"
+              className="grid h-4 w-4 place-items-center rounded-full hover:bg-black/10 dark:hover:bg-white/10"
               aria-label={`Remove ${t}`}
             >
               <X size={11} />
@@ -84,7 +93,7 @@ export function TagSelect({
           onKeyDown={onKeyDown}
           onFocus={() => setOpen(true)}
           onBlur={() => setTimeout(() => setOpen(false), 120)}
-          placeholder={selected.length ? "" : "Add tags…"}
+          placeholder={selected.length ? "" : placeholder}
           className="min-w-[100px] flex-1 bg-transparent px-1 py-0.5 text-sm outline-none placeholder:text-muted"
         />
       </div>

@@ -6,6 +6,17 @@ export const STATUSES: Status[] = ["To pick", "Working", "In Review", "Completed
 export const EFFORTS: Effort[] = ["Low", "Med", "High"];
 export const PRIORITIES: Priority[] = ["Low", "Medium", "High", "Urgent"];
 
+// Starter list shown in the Metrics dropdown even before anyone has used them.
+// Anything typed beyond this list is just added to the suggestions automatically.
+export const DEFAULT_METRICS = [
+  "I2H",
+  "NPS",
+  "Class Ratings",
+  "Cue Card Ratings",
+  "Module Ratings",
+  "PSP",
+];
+
 export type Profile = {
   id: string;
   email: string;
@@ -27,6 +38,7 @@ export type Task = {
   picked_date: string | null;
   delivered_date: string | null;
   tags: string[];
+  metrics: string[];
   slack_link: string | null;
   sheet_link: string | null;
   created_at: string;

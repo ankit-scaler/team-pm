@@ -117,3 +117,15 @@ Adds: completed cards show the **delivered date**; a bold **Delayed** badge when
 
 ### The overdue Slack digest
 The existing daily cron (`/api/keepalive`, already in `vercel.json`) now also posts a Slack summary of every task whose ETA is today or earlier and isn't Completed. It needs `SLACK_WEBHOOK_URL` set; with no webhook it simply does nothing. It runs once a day, so it won't spam the channel. To change the time, edit the `schedule` (cron, UTC) in `vercel.json`.
+
+---
+
+## Update v4 — Metrics
+
+Adds a **Metrics** field on tasks: multi-select dropdown pre-seeded with `I2H, NPS, Class Ratings, Cue Card Ratings, Module Ratings, PSP`, plus the ability to type and add new metrics on the fly (same pattern as Tags). Selected metrics show as cyan chips on cards/rows, and the Tasks page gets a metrics filter.
+
+### To apply this update
+1. **Run the migration:** Supabase → SQL Editor → paste [`supabase/migration_v4.sql`](supabase/migration_v4.sql) → Run.
+2. **Push & redeploy.** No new environment variables.
+
+To change the starter metric list later, edit `DEFAULT_METRICS` in `lib/types.ts`.

@@ -16,10 +16,12 @@ export function TaskForm({
   people,
   task,
   allTags = [],
+  allMetrics = [],
 }: {
   people: Profile[];
   task?: Task;
   allTags?: string[];
+  allMetrics?: string[];
 }) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -201,6 +203,18 @@ export function TaskForm({
               <div>
                 <label className={labelCls}>Tags</label>
                 <TagSelect suggestions={allTags} defaultTags={task?.tags ?? []} />
+              </div>
+
+              <div>
+                <label className={labelCls}>Metrics</label>
+                <TagSelect
+                  suggestions={allMetrics}
+                  defaultTags={task?.metrics ?? []}
+                  fieldName="metrics"
+                  placeholder="Select or add metrics…"
+                  prefix=""
+                  chipClass="bg-cyan-100 text-cyan-700 dark:bg-cyan-950 dark:text-cyan-300 hover:bg-cyan-200/60 dark:hover:bg-cyan-900"
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-3">

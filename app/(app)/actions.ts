@@ -35,11 +35,11 @@ function str(v: FormDataEntryValue | null): string | null {
   return s === "" ? null : s;
 }
 
-// Dedupe + clean the tags submitted from the form.
-function parseTags(formData: FormData): string[] {
+// Dedupe + clean a multi-value field submitted from the form (tags, metrics).
+function parseMultiValue(formData: FormData, field: string): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
-  for (const v of formData.getAll("tags")) {
+  for (const v of formData.getAll(field)) {
     const s = v.toString().trim();
     if (s && !seen.has(s.toLowerCase())) {
       seen.add(s.toLowerCase());
@@ -77,7 +77,8 @@ export async function createTask(formData: FormData) {
       priority: str(formData.get("priority")) ?? "Medium",
       assignee_id: str(formData.get("assignee_id")),
       delivered_date: str(formData.get("delivered_date")),
-      tags: parseTags(formData),
+      tags: parseMultiValue(formData, "tags"),
+      metrics: parseMultiValue(formData, "metrics"),
       slack_link: str(formData.get("slack_link")),
       sheet_link: str(formData.get("sheet_link")),
       created_by: me.id,
@@ -127,7 +128,8 @@ export async function updateTask(taskId: string, formData: FormData) {
       priority: str(formData.get("priority")) ?? "Medium",
       assignee_id: str(formData.get("assignee_id")),
       delivered_date: str(formData.get("delivered_date")),
-      tags: parseTags(formData),
+      tags: parseMultiValue(formData, "tags"),
+      metrics: parseMultiValue(formData, "metrics"),
       slack_link: str(formData.get("slack_link")),
       sheet_link: str(formData.get("sheet_link")),
     })

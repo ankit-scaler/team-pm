@@ -28,16 +28,19 @@ export function TaskTable({
   tasks,
   people,
   allTags = [],
+  allMetrics = [],
 }: {
   tasks: Task[];
   people: Profile[];
   allTags?: string[];
+  allMetrics?: string[];
 }) {
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("");
   const [assignee, setAssignee] = useState("");
   const [priority, setPriority] = useState("");
   const [tag, setTag] = useState("");
+  const [metric, setMetric] = useState("");
   const [etaFrom, setEtaFrom] = useState("");
   const [etaTo, setEtaTo] = useState("");
 
@@ -48,14 +51,15 @@ export function TaskTable({
       if (assignee === "unassigned" ? t.assignee_id : assignee && t.assignee_id !== assignee)
         return false;
       if (tag && !t.tags.includes(tag)) return false;
+      if (metric && !t.metrics.includes(metric)) return false;
       if (etaFrom && (!t.eta || t.eta < etaFrom)) return false;
       if (etaTo && (!t.eta || t.eta > etaTo)) return false;
       if (q && !t.title.toLowerCase().includes(q.toLowerCase())) return false;
       return true;
     });
-  }, [tasks, q, status, assignee, priority, tag, etaFrom, etaTo]);
+  }, [tasks, q, status, assignee, priority, tag, metric, etaFrom, etaTo]);
 
-  const anyFilter = q || status || assignee || priority || tag || etaFrom || etaTo;
+  const anyFilter = q || status || assignee || priority || tag || metric || etaFrom || etaTo;
 
   return (
     <div className="space-y-3">
@@ -93,6 +97,14 @@ export function TaskTable({
             ))}
           </select>
         )}
+        {allMetrics.length > 0 && (
+          <select value={metric} onChange={(e) => setMetric(e.target.value)} className={selCls}>
+            <option value="">All metrics</option>
+            {allMetrics.map((m) => (
+              <option key={m} value={m}>{m}</option>
+            ))}
+          </select>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -104,7 +116,7 @@ export function TaskTable({
           <button
             type="button"
             onClick={() => {
-              setQ(""); setStatus(""); setAssignee(""); setPriority(""); setTag(""); setEtaFrom(""); setEtaTo("");
+              setQ(""); setStatus(""); setAssignee(""); setPriority(""); setTag(""); setMetric(""); setEtaFrom(""); setEtaTo("");
             }}
             className="text-xs text-accent hover:underline"
           >
@@ -145,6 +157,15 @@ export function TaskTable({
                       {t.tags.map((tg) => (
                         <span key={tg} className="rounded-full bg-violet-100 px-1.5 py-0.5 text-[11px] font-medium text-violet-700 dark:bg-violet-950 dark:text-violet-300">
                           #{tg}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {t.metrics.length > 0 && (
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {t.metrics.map((m) => (
+                        <span key={m} className="rounded-full bg-cyan-100 px-1.5 py-0.5 text-[11px] font-medium text-cyan-700 dark:bg-cyan-950 dark:text-cyan-300">
+                          {m}
                         </span>
                       ))}
                     </div>
@@ -192,7 +213,7 @@ export function TaskTable({
                   )}
                 </td>
                 <td className="px-4 py-3 text-right">
-                  <TaskForm people={people} task={t} allTags={allTags} />
+                  <TaskForm people={people} task={t} allTags={allTags} allMetrics={allMetrics} />
                 </td>
               </tr>
             ))}
