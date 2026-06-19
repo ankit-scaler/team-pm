@@ -25,7 +25,7 @@ function LoginInner() {
     <main className="grid min-h-screen place-items-center px-6">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-xl bg-accent text-lg font-semibold text-white">
+          <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-xl bg-accent text-lg font-semibold text-black">
             Scaler
           </div>
           <h1 className="text-xl font-semibold tracking-tight">Instructor Team Task Manager tool</h1>
