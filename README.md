@@ -103,3 +103,17 @@ This version adds: an **Admin tab** (user management), **delete/remove user**, *
    (You must have signed in at least once so your profile row exists.)
 2. **Redeploy:** commit and push these files; Vercel auto-deploys. No new environment variables are needed — `SUPABASE_SERVICE_ROLE_KEY` (already set) powers the admin user-management actions.
 3. Reload the app. The **Admin** tab appears for admins only. Removing a user there deletes their login + profile; their tasks remain but become unassigned.
+
+---
+
+## Update v3 — what changed
+
+Adds: completed cards show the **delivered date**; a bold **Delayed** badge when a task is completed after its ETA; **stage-tinted cards** (each stage has its own calm colour family, each card a deterministic shade); **bolder text** and stronger colours; optional **Slack link** and **Relevant sheet** fields per task (shown as link chips); a **daily Slack digest** of tasks past their ETA that aren't completed; **calendar-dropdown date inputs** everywhere (click any date field to open the picker); a **loading screen** with rotating motivational lines on navigation and task save; the **Scaler logo** top-left; and a **footer** (contact Ankit / beta notice).
+
+### To apply this update
+1. **Run the migration:** Supabase → SQL Editor → paste [`supabase/migration_v3.sql`](supabase/migration_v3.sql) (adds `slack_link`, `sheet_link`). Run it.
+2. **Add the logo:** download the Scaler logo and save it as `public/scaler-logo.png` (see `public/README-LOGO.txt`). If absent, a "Scaler" text wordmark shows instead — nothing breaks.
+3. **Push & redeploy.** No new environment variables.
+
+### The overdue Slack digest
+The existing daily cron (`/api/keepalive`, already in `vercel.json`) now also posts a Slack summary of every task whose ETA is today or earlier and isn't Completed. It needs `SLACK_WEBHOOK_URL` set; with no webhook it simply does nothing. It runs once a day, so it won't spam the channel. To change the time, edit the `schedule` (cron, UTC) in `vercel.json`.

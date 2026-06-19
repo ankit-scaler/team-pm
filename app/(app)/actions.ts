@@ -78,6 +78,8 @@ export async function createTask(formData: FormData) {
       assignee_id: str(formData.get("assignee_id")),
       delivered_date: str(formData.get("delivered_date")),
       tags: parseTags(formData),
+      slack_link: str(formData.get("slack_link")),
+      sheet_link: str(formData.get("sheet_link")),
       created_by: me.id,
     })
     .select("id, title, status")
@@ -126,6 +128,8 @@ export async function updateTask(taskId: string, formData: FormData) {
       assignee_id: str(formData.get("assignee_id")),
       delivered_date: str(formData.get("delivered_date")),
       tags: parseTags(formData),
+      slack_link: str(formData.get("slack_link")),
+      sheet_link: str(formData.get("sheet_link")),
     })
     .eq("id", taskId);
 

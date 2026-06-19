@@ -2,12 +2,24 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, MessageSquare, FileSpreadsheet } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { changeStatus } from "../(app)/actions";
 import { TaskForm } from "./task-form";
 import { PriorityLabel, EffortChip } from "./status-badge";
-import { STATUSES, STATUS_STYLES, type Profile, type Status, type Task } from "@/lib/types";
+import {
+  STATUSES,
+  STATUS_STYLES,
+  STAGE_ACCENT,
+  cardTint,
+  type Profile,
+  type Status,
+  type Task,
+} from "@/lib/types";
+
+function isDelayed(t: Task) {
+  return t.status === "Completed" && t.eta && t.delivered_date && t.delivered_date > t.eta;
+}
 
 function fmt(d: string | null) {
   if (!d) return null;
@@ -122,10 +134,10 @@ export function KanbanBoard({
                 {items.map((t) => (
                   <article
                     key={t.id}
-                    className="group rounded-lg border border-border bg-surface p-3 shadow-sm"
+                    className={`group rounded-lg border border-l-4 border-border ${STAGE_ACCENT[col]} ${cardTint(col, t.id)} p-3 shadow-sm`}
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <h3 className="text-sm font-medium leading-snug">{t.title}</h3>
+                      <h3 className="text-sm font-bold leading-snug text-fg">{t.title}</h3>
                       <div className="opacity-0 transition-opacity group-hover:opacity-100">
                         <TaskForm people={people} task={t} allTags={allTags} />
                       </div>
@@ -135,7 +147,17 @@ export function KanbanBoard({
                       <PriorityLabel priority={t.priority} />
                       <EffortChip effort={t.effort} />
                       {t.eta && (
-                        <span className="text-xs text-muted">ETA {fmt(t.eta)}</span>
+                        <span className="text-xs font-medium text-muted">ETA {fmt(t.eta)}</span>
+                      )}
+                      {t.status === "Completed" && t.delivered_date && (
+                        <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+                          Delivered {fmt(t.delivered_date)}
+                        </span>
+                      )}
+                      {isDelayed(t) && (
+                        <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-bold text-red-700 dark:bg-red-950 dark:text-red-300">
+                          Delayed
+                        </span>
                       )}
                     </div>
 
@@ -144,7 +166,7 @@ export function KanbanBoard({
                         {t.tags.map((tg) => (
                           <span
                             key={tg}
-                            className="rounded-full bg-violet-100 px-1.5 py-0.5 text-[11px] text-violet-700 dark:bg-violet-950 dark:text-violet-300"
+                            className="rounded-full bg-violet-100 px-1.5 py-0.5 text-[11px] font-medium text-violet-700 dark:bg-violet-950 dark:text-violet-300"
                           >
                             #{tg}
                           </span>
@@ -152,8 +174,33 @@ export function KanbanBoard({
                       </div>
                     )}
 
+                    {(t.slack_link || t.sheet_link) && (
+                      <div className="mt-2 flex items-center gap-3">
+                        {t.slack_link && (
+                          <a
+                            href={t.slack_link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-[11px] font-medium text-accent hover:underline"
+                          >
+                            <MessageSquare size={12} /> Slack
+                          </a>
+                        )}
+                        {t.sheet_link && (
+                          <a
+                            href={t.sheet_link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-[11px] font-medium text-accent hover:underline"
+                          >
+                            <FileSpreadsheet size={12} /> Sheet
+                          </a>
+                        )}
+                      </div>
+                    )}
+
                     <div className="mt-3 flex items-center justify-between">
-                      <span className="truncate text-xs text-muted">
+                      <span className="truncate text-xs font-medium text-muted">
                         {t.assignee ? (t.assignee.full_name ?? t.assignee.email) : "Unassigned"}
                       </span>
                       <div className="flex items-center gap-1">

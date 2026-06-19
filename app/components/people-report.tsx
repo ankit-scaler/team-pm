@@ -54,9 +54,9 @@ export function PeopleReport({ tasks, people }: { tasks: Task[]; people: Profile
           ))}
         </select>
         <span className="text-muted">Count picked / closed between</span>
-        <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={inputCls} />
+        <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} onClick={(e) => (e.currentTarget as any).showPicker?.()} className={`${inputCls} cursor-pointer`} />
         <span className="text-muted">and</span>
-        <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className={inputCls} />
+        <input type="date" value={to} onChange={(e) => setTo(e.target.value)} onClick={(e) => (e.currentTarget as any).showPicker?.()} className={`${inputCls} cursor-pointer`} />
         {(from || to || personId) && (
           <button
             type="button"

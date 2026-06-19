@@ -5,6 +5,7 @@ import { Pencil, Plus, Trash2, X } from "lucide-react";
 import { createTask, updateTask, deleteTask } from "../(app)/actions";
 import { StakeholderSelect } from "./stakeholder-select";
 import { TagSelect } from "./tag-select";
+import { Loader } from "./loader";
 import { STATUSES, EFFORTS, PRIORITIES, type Profile, type Task } from "@/lib/types";
 
 const fieldCls =
@@ -75,9 +76,14 @@ export function TaskForm({
           onMouseDown={() => setOpen(false)}
         >
           <div
-            className="w-full max-w-lg rounded-xl border border-border bg-surface p-5 shadow-xl"
+            className="relative w-full max-w-lg rounded-xl border border-border bg-surface p-5 shadow-xl"
             onMouseDown={(e) => e.stopPropagation()}
           >
+            {pending && (
+              <div className="absolute inset-0 z-10 grid place-items-center rounded-xl bg-surface/85 backdrop-blur-sm">
+                <Loader className="py-0" />
+              </div>
+            )}
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-base font-semibold">{isEdit ? "Edit task" : "New task"}</h2>
               <button
@@ -195,6 +201,29 @@ export function TaskForm({
               <div>
                 <label className={labelCls}>Tags</label>
                 <TagSelect suggestions={allTags} defaultTags={task?.tags ?? []} />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>Slack link (optional)</label>
+                  <input
+                    type="url"
+                    name="slack_link"
+                    defaultValue={task?.slack_link ?? ""}
+                    placeholder="https://slack.com/…"
+                    className={fieldCls}
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Relevant sheet (optional)</label>
+                  <input
+                    type="url"
+                    name="sheet_link"
+                    defaultValue={task?.sheet_link ?? ""}
+                    placeholder="https://docs.google.com/…"
+                    className={fieldCls}
+                  />
+                </div>
               </div>
 
               {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}

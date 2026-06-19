@@ -53,3 +53,35 @@ export async function notifyStatusChange(p: StatusChangePayload): Promise<void> 
     console.error("Slack notify failed:", e);
   }
 }
+
+type OverdueItem = { title: string; eta: string; assignee: string | null };
+
+// Daily digest of tasks whose ETA has passed (or is today) and aren't completed.
+export async function notifyOverdue(items: OverdueItem[], appUrl?: string): Promise<void> {
+  const webhook = process.env.SLACK_WEBHOOK_URL;
+  if (!webhook || items.length === 0) return;
+
+  const lines = items
+    .map((i) => `• *${i.title}* — ETA ${i.eta}${i.assignee ? ` (_${i.assignee}_)` : ""}`)
+    .join("\n");
+  const header = `⏰ *${items.length} task${items.length > 1 ? "s" : ""} past ETA and not completed*`;
+  const link = appUrl ? `${appUrl}/tasks` : undefined;
+
+  try {
+    await fetch(webhook, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text: `${header}\n${lines}`,
+        blocks: [
+          { type: "section", text: { type: "mrkdwn", text: `${header}\n${lines}` } },
+          ...(link
+            ? [{ type: "context", elements: [{ type: "mrkdwn", text: `<${link}|Open the board>` }] }]
+            : []),
+        ],
+      }),
+    });
+  } catch (e) {
+    console.error("Slack overdue notify failed:", e);
+  }
+}

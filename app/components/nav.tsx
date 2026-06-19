@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 import { ThemeToggle } from "./theme-toggle";
 import type { Profile } from "@/lib/types";
 
@@ -13,6 +14,7 @@ const BASE_LINKS = [
 
 export function Nav({ profile }: { profile: Profile }) {
   const pathname = usePathname();
+  const [logoOk, setLogoOk] = useState(true);
   const links =
     profile.role === "admin"
       ? [...BASE_LINKS, { href: "/admin", label: "Admin" }]
@@ -22,10 +24,20 @@ export function Nav({ profile }: { profile: Profile }) {
     <header className="sticky top-0 z-20 border-b border-border bg-bg/80 backdrop-blur">
       <div className="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4 sm:px-6">
         <Link href="/board" className="flex items-center gap-2">
-          <span className="grid h-7 w-7 place-items-center rounded-md bg-accent text-xs font-bold text-white">
-            PM
+          {logoOk ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src="/scaler-logo.png"
+              alt="Scaler"
+              className="h-7 w-auto"
+              onError={() => setLogoOk(false)}
+            />
+          ) : (
+            <span className="text-base font-extrabold tracking-tight text-accent">Scaler</span>
+          )}
+          <span className="hidden text-sm font-semibold tracking-tight text-muted sm:inline">
+            · Team PM
           </span>
-          <span className="text-sm font-semibold tracking-tight">Instructor Team Task manager</span>
         </Link>
 
         <nav className="ml-2 flex items-center gap-1">

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Nav } from "../components/nav";
+import { Footer } from "../components/footer";
 import type { Profile } from "@/lib/types";
 
 export default async function AppLayout({
@@ -31,9 +32,10 @@ export default async function AppLayout({
     };
 
   return (
-    <div className="min-h-screen">
+    <div className="flex min-h-screen flex-col">
       <Nav profile={safeProfile} />
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6">{children}</main>
+      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6">{children}</main>
+      <Footer />
     </div>
   );
 }

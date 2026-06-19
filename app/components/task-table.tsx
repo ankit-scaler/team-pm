@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { MessageSquare, FileSpreadsheet } from "lucide-react";
 import { TaskForm } from "./task-form";
 import { StatusBadge, PriorityLabel, EffortChip } from "./status-badge";
 import { STATUSES, PRIORITIES, type Profile, type Task } from "@/lib/types";
@@ -15,6 +16,11 @@ function fmt(d: string | null) {
 function isOverdue(t: Task) {
   return t.eta && t.status !== "Completed" && new Date(t.eta) < new Date(new Date().toDateString());
 }
+function isDelayed(t: Task) {
+  return t.status === "Completed" && t.eta && t.delivered_date && t.delivered_date > t.eta;
+}
+const openCalendar = (e: React.MouseEvent<HTMLInputElement>) =>
+  (e.currentTarget as any).showPicker?.();
 
 const selCls = "rounded-lg border border-border bg-surface px-2.5 py-1.5 text-sm outline-none";
 
@@ -91,9 +97,9 @@ export function TaskTable({
 
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <span className="text-muted">ETA between</span>
-        <input type="date" value={etaFrom} onChange={(e) => setEtaFrom(e.target.value)} className={selCls} />
+        <input type="date" value={etaFrom} onChange={(e) => setEtaFrom(e.target.value)} onClick={openCalendar} className={`${selCls} cursor-pointer`} />
         <span className="text-muted">and</span>
-        <input type="date" value={etaTo} onChange={(e) => setEtaTo(e.target.value)} className={selCls} />
+        <input type="date" value={etaTo} onChange={(e) => setEtaTo(e.target.value)} onClick={openCalendar} className={`${selCls} cursor-pointer`} />
         {anyFilter && (
           <button
             type="button"
@@ -133,14 +139,28 @@ export function TaskTable({
             {filtered.map((t) => (
               <tr key={t.id} className="border-b border-border last:border-0 hover:bg-bg/60">
                 <td className="max-w-xs px-4 py-3">
-                  <div className="font-medium">{t.title}</div>
+                  <div className="font-semibold text-fg">{t.title}</div>
                   {t.tags.length > 0 && (
                     <div className="mt-1 flex flex-wrap gap-1">
                       {t.tags.map((tg) => (
-                        <span key={tg} className="rounded-full bg-violet-100 px-1.5 py-0.5 text-[11px] text-violet-700 dark:bg-violet-950 dark:text-violet-300">
+                        <span key={tg} className="rounded-full bg-violet-100 px-1.5 py-0.5 text-[11px] font-medium text-violet-700 dark:bg-violet-950 dark:text-violet-300">
                           #{tg}
                         </span>
                       ))}
+                    </div>
+                  )}
+                  {(t.slack_link || t.sheet_link) && (
+                    <div className="mt-1 flex items-center gap-3">
+                      {t.slack_link && (
+                        <a href={t.slack_link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[11px] font-medium text-accent hover:underline">
+                          <MessageSquare size={12} /> Slack
+                        </a>
+                      )}
+                      {t.sheet_link && (
+                        <a href={t.sheet_link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[11px] font-medium text-accent hover:underline">
+                          <FileSpreadsheet size={12} /> Sheet
+                        </a>
+                      )}
                     </div>
                   )}
                   {t.stakeholders && t.stakeholders.length > 0 && (
@@ -163,7 +183,14 @@ export function TaskTable({
                   {fmt(t.eta)}
                   {isOverdue(t) && <span className="ml-1 text-[11px]">overdue</span>}
                 </td>
-                <td className="px-4 py-3 text-muted">{fmt(t.delivered_date)}</td>
+                <td className="px-4 py-3 text-muted">
+                  {fmt(t.delivered_date)}
+                  {isDelayed(t) && (
+                    <span className="ml-1.5 inline-flex items-center rounded-full bg-red-100 px-1.5 py-0.5 text-[11px] font-bold text-red-700 dark:bg-red-950 dark:text-red-300">
+                      Delayed
+                    </span>
+                  )}
+                </td>
                 <td className="px-4 py-3 text-right">
                   <TaskForm people={people} task={t} allTags={allTags} />
                 </td>
