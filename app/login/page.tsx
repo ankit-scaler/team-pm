@@ -28,8 +28,8 @@ function LoginInner() {
           <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-xl bg-accent text-lg font-semibold text-white">
             PM
           </div>
-          <h1 className="text-xl font-semibold tracking-tight">Team PM</h1>
-          <p className="mt-1 text-sm text-muted">Sign in to manage the team's work</p>
+          <h1 className="text-xl font-semibold tracking-tight">Instructor Team Task Manager tool</h1>
+          <p className="mt-1 text-sm text-muted">Sign in to manage the team's work, Use Scaler Mail only</p>
         </div>
 
         {error === "domain" && (
