@@ -139,3 +139,13 @@ The daily cron (`/api/keepalive`) now also posts a Slack reminder for tasks whos
 No migration, no new env vars — it reuses `SLACK_WEBHOOK_URL` you already set. Just push this update and it starts working on the next scheduled cron run.
 
 To change what "tomorrow" means (e.g. 2 days prior instead of 1), edit the `tomorrow` calculation in `app/api/keepalive/route.ts`.
+
+---
+
+## Fix — /api routes no longer redirected to /login
+
+The auth middleware was matching every route including `/api/*`, which meant `/api/keepalive` got redirected to `/login` for any caller without a browser session (curl, Postman, Vercel's own cron). This is why manual testing showed "Redirecting..." instead of the JSON response.
+
+Fixed by excluding `api/` from the middleware matcher in `middleware.ts`. API routes handle their own auth independently (`/api/keepalive` via `CRON_SECRET`), so they were never meant to go through the page-login check.
+
+No env vars, no migration — just this middleware fix. After deploying, the curl command should return JSON directly instead of "Redirecting...".
