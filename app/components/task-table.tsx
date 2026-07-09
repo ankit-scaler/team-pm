@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { MessageSquare, FileSpreadsheet } from "lucide-react";
 import { TaskForm } from "./task-form";
 import { StatusBadge, PriorityLabel, EffortChip } from "./status-badge";
-import { STATUSES, PRIORITIES, type Profile, type Task } from "@/lib/types";
+import { STATUSES, PRIORITIES, PROGRAMS, TRACKS, type Profile, type Task } from "@/lib/types";
 
 function fmt(d: string | null) {
   if (!d) return "—";
@@ -41,6 +41,8 @@ export function TaskTable({
   const [priority, setPriority] = useState("");
   const [tag, setTag] = useState("");
   const [metric, setMetric] = useState("");
+  const [program, setProgram] = useState("");
+  const [track, setTrack] = useState("");
   const [etaFrom, setEtaFrom] = useState("");
   const [etaTo, setEtaTo] = useState("");
 
@@ -52,14 +54,16 @@ export function TaskTable({
         return false;
       if (tag && !t.tags.includes(tag)) return false;
       if (metric && !t.metrics.includes(metric)) return false;
+      if (program && t.program !== program) return false;
+      if (track && t.track !== track) return false;
       if (etaFrom && (!t.eta || t.eta < etaFrom)) return false;
       if (etaTo && (!t.eta || t.eta > etaTo)) return false;
       if (q && !t.title.toLowerCase().includes(q.toLowerCase())) return false;
       return true;
     });
-  }, [tasks, q, status, assignee, priority, tag, metric, etaFrom, etaTo]);
+  }, [tasks, q, status, assignee, priority, tag, metric, program, track, etaFrom, etaTo]);
 
-  const anyFilter = q || status || assignee || priority || tag || metric || etaFrom || etaTo;
+  const anyFilter = q || status || assignee || priority || tag || metric || program || track || etaFrom || etaTo;
 
   return (
     <div className="space-y-3">
@@ -105,6 +109,18 @@ export function TaskTable({
             ))}
           </select>
         )}
+        <select value={program} onChange={(e) => setProgram(e.target.value)} className={selCls}>
+          <option value="">All programs</option>
+          {PROGRAMS.map((p) => (
+            <option key={p} value={p}>{p}</option>
+          ))}
+        </select>
+        <select value={track} onChange={(e) => setTrack(e.target.value)} className={selCls}>
+          <option value="">All tracks</option>
+          {TRACKS.map((t) => (
+            <option key={t} value={t}>{t}</option>
+          ))}
+        </select>
       </div>
 
       <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -116,7 +132,7 @@ export function TaskTable({
           <button
             type="button"
             onClick={() => {
-              setQ(""); setStatus(""); setAssignee(""); setPriority(""); setTag(""); setMetric(""); setEtaFrom(""); setEtaTo("");
+              setQ(""); setStatus(""); setAssignee(""); setPriority(""); setTag(""); setMetric(""); setProgram(""); setTrack(""); setEtaFrom(""); setEtaTo("");
             }}
             className="text-xs text-accent hover:underline"
           >
