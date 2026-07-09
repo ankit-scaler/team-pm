@@ -129,3 +129,13 @@ Adds a **Metrics** field on tasks: multi-select dropdown pre-seeded with `I2H, N
 2. **Push & redeploy.** No new environment variables.
 
 To change the starter metric list later, edit `DEFAULT_METRICS` in `lib/types.ts`.
+
+---
+
+## Update v6 — ETA reminder (1 day prior)
+
+The daily cron (`/api/keepalive`) now also posts a Slack reminder for tasks whose **ETA is tomorrow** and aren't Completed, in addition to the existing "past ETA" digest. Two separate messages, so it's clear which is a heads-up vs. an already-late task.
+
+No migration, no new env vars — it reuses `SLACK_WEBHOOK_URL` you already set. Just push this update and it starts working on the next scheduled cron run.
+
+To change what "tomorrow" means (e.g. 2 days prior instead of 1), edit the `tomorrow` calculation in `app/api/keepalive/route.ts`.

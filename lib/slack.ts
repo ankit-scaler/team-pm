@@ -85,3 +85,34 @@ export async function notifyOverdue(items: OverdueItem[], appUrl?: string): Prom
     console.error("Slack overdue notify failed:", e);
   }
 }
+
+// Daily reminder of tasks whose ETA is tomorrow and aren't completed — a heads-up
+// before they become overdue.
+export async function notifyDueSoon(items: OverdueItem[], appUrl?: string): Promise<void> {
+  const webhook = process.env.SLACK_WEBHOOK_URL;
+  if (!webhook || items.length === 0) return;
+
+  const lines = items
+    .map((i) => `• *${i.title}* — ETA ${i.eta}${i.assignee ? ` (_${i.assignee}_)` : ""}`)
+    .join("\n");
+  const header = `📅 *${items.length} task${items.length > 1 ? "s" : ""} due tomorrow*`;
+  const link = appUrl ? `${appUrl}/tasks` : undefined;
+
+  try {
+    await fetch(webhook, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text: `${header}\n${lines}`,
+        blocks: [
+          { type: "section", text: { type: "mrkdwn", text: `${header}\n${lines}` } },
+          ...(link
+            ? [{ type: "context", elements: [{ type: "mrkdwn", text: `<${link}|Open the board>` }] }]
+            : []),
+        ],
+      }),
+    });
+  } catch (e) {
+    console.error("Slack due-soon notify failed:", e);
+  }
+}
