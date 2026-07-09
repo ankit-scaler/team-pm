@@ -129,3 +129,22 @@ Adds a **Metrics** field on tasks: multi-select dropdown pre-seeded with `I2H, N
 2. **Push & redeploy.** No new environment variables.
 
 To change the starter metric list later, edit `DEFAULT_METRICS` in `lib/types.ts`.
+
+---
+### How to update KRs in the future: 
+
+open app/(app)/krs/page.tsx, find the KRS array at the top, and edit it directly. Each entry is a plain object:
+'''
+typescript{
+  id: "KR 1",           // badge label
+  name: "Module Ratings", // heading
+  validFor: "Instructor Team",
+  metricType: "Leading", // or "Lagging"
+  section: "kr",         // or "good-practice"
+  points: [
+    "First point...",
+    "Second point...",
+  ],
+},
+'''
+Add a new KR by adding another object to the array. Remove one by deleting it. Change text by editing the strings.

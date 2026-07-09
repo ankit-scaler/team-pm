@@ -40,6 +40,17 @@ export type Profile = {
   role: "member" | "admin";
 };
 
+export type KR = {
+  id: string;
+  name: string;
+  target: string;
+  current: string;
+  status: "On track" | "At risk" | "Behind" | "Achieved";
+  sort_order: number;
+};
+
+export const KR_STATUSES = ["On track", "At risk", "Behind", "Achieved"] as const;
+
 export type Task = {
   id: string;
   title: string;
