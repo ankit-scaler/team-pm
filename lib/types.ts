@@ -17,6 +17,21 @@ export const DEFAULT_METRICS = [
   "PSP",
 ];
 
+export const PROGRAMS = ["Academy", "DevOps", "AIML", "DSML"] as const;
+export type Program = (typeof PROGRAMS)[number];
+
+export const TRACKS = [
+  "DSA",
+  "Full Stack",
+  "Backend",
+  "Machine Learning",
+  "Data Science",
+  "Data Analytics",
+  "DevOps",
+  "FDE",
+] as const;
+export type Track = (typeof TRACKS)[number];
+
 export type Profile = {
   id: string;
   email: string;
@@ -41,6 +56,8 @@ export type Task = {
   metrics: string[];
   slack_link: string | null;
   sheet_link: string | null;
+  program: string | null;
+  track: string | null;
   created_at: string;
   updated_at: string;
   assignee?: Profile | null;

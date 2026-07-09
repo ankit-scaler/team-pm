@@ -6,7 +6,7 @@ import { createTask, updateTask, deleteTask } from "../(app)/actions";
 import { StakeholderSelect } from "./stakeholder-select";
 import { TagSelect } from "./tag-select";
 import { Loader } from "./loader";
-import { STATUSES, EFFORTS, PRIORITIES, type Profile, type Task } from "@/lib/types";
+import { STATUSES, EFFORTS, PRIORITIES, PROGRAMS, TRACKS, type Profile, type Task } from "@/lib/types";
 
 const fieldCls =
   "w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-accent";
@@ -164,6 +164,27 @@ export function TaskForm({
                       <option key={e} value={e}>
                         {e}
                       </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>Program</label>
+                  <select name="program" defaultValue={task?.program ?? ""} className={fieldCls}>
+                    <option value="">—</option>
+                    {PROGRAMS.map((p) => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className={labelCls}>Track</label>
+                  <select name="track" defaultValue={task?.track ?? ""} className={fieldCls}>
+                    <option value="">—</option>
+                    {TRACKS.map((t) => (
+                      <option key={t} value={t}>{t}</option>
                     ))}
                   </select>
                 </div>

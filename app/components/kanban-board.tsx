@@ -189,6 +189,21 @@ export function KanbanBoard({
                       </div>
                     )}
 
+                    {(t.program || t.track) && (
+                      <div className="mt-1.5 flex flex-wrap gap-1">
+                        {t.program && (
+                          <span className="rounded bg-pink-100 px-1.5 py-0.5 text-[11px] font-medium text-pink-700 dark:bg-pink-950 dark:text-pink-300">
+                            {t.program}
+                          </span>
+                        )}
+                        {t.track && (
+                          <span className="rounded bg-teal-100 px-1.5 py-0.5 text-[11px] font-medium text-teal-700 dark:bg-teal-950 dark:text-teal-300">
+                            {t.track}
+                          </span>
+                        )}
+                      </div>
+                    )}
+
                     {(t.slack_link || t.sheet_link) && (
                       <div className="mt-2 flex items-center gap-3">
                         {t.slack_link && (

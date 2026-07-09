@@ -9,7 +9,9 @@ import type { Profile } from "@/lib/types";
 const BASE_LINKS = [
   { href: "/board", label: "Board" },
   { href: "/tasks", label: "Tasks" },
+  { href: "/program-track", label: "Program·Track" },
   { href: "/people", label: "People" },
+  { href: "/krs", label: "KRs" },
 ];
 
 export function Nav({ profile }: { profile: Profile }) {

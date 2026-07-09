@@ -32,6 +32,8 @@ export async function getTasks(): Promise<Task[]> {
     ...row,
     tags: row.tags ?? [],
     metrics: row.metrics ?? [],
+    program: row.program ?? null,
+    track: row.track ?? null,
     assignee: row.assignee ?? null,
     stakeholders: (row.task_stakeholders ?? [])
       .map((s: any) => s.profile)

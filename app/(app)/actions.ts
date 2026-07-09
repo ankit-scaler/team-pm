@@ -81,6 +81,8 @@ export async function createTask(formData: FormData) {
       metrics: parseMultiValue(formData, "metrics"),
       slack_link: str(formData.get("slack_link")),
       sheet_link: str(formData.get("sheet_link")),
+      program: str(formData.get("program")),
+      track: str(formData.get("track")),
       created_by: me.id,
     })
     .select("id, title, status")
@@ -132,6 +134,8 @@ export async function updateTask(taskId: string, formData: FormData) {
       metrics: parseMultiValue(formData, "metrics"),
       slack_link: str(formData.get("slack_link")),
       sheet_link: str(formData.get("sheet_link")),
+      program: str(formData.get("program")),
+      track: str(formData.get("track")),
     })
     .eq("id", taskId);
 
