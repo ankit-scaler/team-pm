@@ -92,12 +92,25 @@ export async function createTask(formData: FormData) {
 
   await syncStakeholders(task.id, stakeholderIds);
 
+  // Look up assignee name for the Slack message (if assigned to someone)
+  const assigneeId = str(formData.get("assignee_id"));
+  let assigneeName: string | null = null;
+  if (assigneeId) {
+    const { data: assignee } = await supabase
+      .from("profiles")
+      .select("full_name, email")
+      .eq("id", assigneeId)
+      .single();
+    assigneeName = assignee?.full_name ?? assignee?.email ?? null;
+  }
+
   await notifyStatusChange({
     taskTitle: task.title,
     taskId: task.id,
     oldStatus: null,
     newStatus: task.status as Status,
     actorName: me.name,
+    assigneeName,
     appUrl: appUrl(),
   });
 

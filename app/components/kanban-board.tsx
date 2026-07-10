@@ -220,18 +220,24 @@ export function KanbanBoard({
                       </div>
                     )}
 
-                    <div className="mt-3 flex items-center justify-between border-t border-border pt-2.5">
-                      <span className="flex items-center gap-1.5 truncate text-xs">
-                        <span className="grid h-5 w-5 flex-shrink-0 place-items-center rounded-full bg-accent-soft text-[10px] font-semibold text-accent">
-                          {t.assignee
-                            ? (t.assignee.full_name ?? t.assignee.email)[0]?.toUpperCase()
-                            : "?"}
+                    <div className="mt-3 flex flex-col gap-1.5 border-t border-border pt-2.5">
+                      {t.creator && t.assignee && t.created_by !== t.assignee_id && (
+                        <span className="text-[11px] text-muted">
+                          Raised by <span className="font-medium text-fg/70">{t.creator.full_name ?? t.creator.email}</span>
                         </span>
-                        <span className="truncate font-medium text-fg/80">
-                          {t.assignee ? (t.assignee.full_name ?? t.assignee.email) : "Unassigned"}
+                      )}
+                      <div className="flex items-center justify-between">
+                        <span className="flex items-center gap-1.5 truncate text-xs">
+                          <span className="grid h-5 w-5 flex-shrink-0 place-items-center rounded-full bg-accent-soft text-[10px] font-semibold text-accent">
+                            {t.assignee
+                              ? (t.assignee.full_name ?? t.assignee.email)[0]?.toUpperCase()
+                              : "?"}
+                          </span>
+                          <span className="truncate font-medium text-fg/80">
+                            {t.assignee ? (t.assignee.full_name ?? t.assignee.email) : "Unassigned"}
+                          </span>
                         </span>
-                      </span>
-                      <div className="flex items-center gap-0.5">
+                        <div className="flex items-center gap-0.5">
                         <button
                           type="button"
                           onClick={() => move(t, -1)}
@@ -250,6 +256,7 @@ export function KanbanBoard({
                         >
                           <ChevronRight size={14} />
                         </button>
+                      </div>
                       </div>
                     </div>
                   </article>

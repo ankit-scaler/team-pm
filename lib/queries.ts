@@ -19,6 +19,7 @@ export async function getTasks(): Promise<Task[]> {
     .select(
       `*,
        assignee:profiles!tasks_assignee_id_fkey (${PROFILE_COLS}),
+       creator:profiles!tasks_created_by_fkey (${PROFILE_COLS}),
        task_stakeholders ( profile:profiles!task_stakeholders_profile_id_fkey (${PROFILE_COLS}) )`
     )
     .order("created_at", { ascending: false });
@@ -35,6 +36,7 @@ export async function getTasks(): Promise<Task[]> {
     program: row.program ?? null,
     track: row.track ?? null,
     assignee: row.assignee ?? null,
+    creator: row.creator ?? null,
     stakeholders: (row.task_stakeholders ?? [])
       .map((s: any) => s.profile)
       .filter(Boolean),

@@ -6,11 +6,12 @@ type StatusChangePayload = {
   oldStatus: Status | null;
   newStatus: Status;
   actorName: string;
+  assigneeName?: string | null; // who the task is assigned to (for new-task messages)
   appUrl?: string;
 };
 
 const STATUS_EMOJI: Record<Status, string> = {
-  "To pick": "🗂️",
+  "To pick": "📌",
   Working: "🛠️",
   "In Review": "🔍",
   Completed: "✅",
@@ -23,9 +24,20 @@ export async function notifyStatusChange(p: StatusChangePayload): Promise<void> 
 
   const link = p.appUrl ? `${p.appUrl}/tasks` : undefined;
 
-  const text = p.oldStatus
-    ? `${STATUS_EMOJI[p.newStatus]} *${p.taskTitle}* moved *${p.oldStatus}* → *${p.newStatus}* by ${p.actorName}`
-    : `🆕 New task *${p.taskTitle}* added (status: *${p.newStatus}*) by ${p.actorName}`;
+  let text: string;
+  if (p.oldStatus) {
+    // Status change
+    text = `${STATUS_EMOJI[p.newStatus]} *${p.taskTitle}* moved *${p.oldStatus}* → *${p.newStatus}* by ${p.actorName}`;
+  } else if (p.assigneeName && p.assigneeName !== p.actorName) {
+    // New task raised FOR someone else
+    text = `🆕 *${p.taskTitle}* raised by *${p.actorName}* → assigned to *${p.assigneeName}* (status: *${p.newStatus}*)`;
+  } else if (p.assigneeName) {
+    // New task raised for self
+    text = `🆕 *${p.taskTitle}* added by *${p.actorName}* (status: *${p.newStatus}*)`;
+  } else {
+    // New task, unassigned
+    text = `🆕 *${p.taskTitle}* raised by *${p.actorName}* (unassigned, status: *${p.newStatus}*)`;
+  }
 
   try {
     await fetch(webhook, {
@@ -64,7 +76,7 @@ export async function notifyOverdue(items: OverdueItem[], appUrl?: string): Prom
   const lines = items
     .map((i) => `• *${i.title}* — ETA ${i.eta}${i.assignee ? ` (_${i.assignee}_)` : ""}`)
     .join("\n");
-  const header = `⏰ *${items.length} task${items.length > 1 ? "s" : ""} past ETA and not completed*`;
+  const header = `🆘⏰ *${items.length} task${items.length > 1 ? "s" : ""} past ETA and not completed*`;
   const link = appUrl ? `${appUrl}/tasks` : undefined;
 
   try {
@@ -95,7 +107,7 @@ export async function notifyDueSoon(items: OverdueItem[], appUrl?: string): Prom
   const lines = items
     .map((i) => `• *${i.title}* — ETA ${i.eta}${i.assignee ? ` (_${i.assignee}_)` : ""}`)
     .join("\n");
-  const header = `📅 *${items.length} task${items.length > 1 ? "s" : ""} due tomorrow*`;
+  const header = `🆘📅 *${items.length} task${items.length > 1 ? "s" : ""} due tomorrow*`;
   const link = appUrl ? `${appUrl}/tasks` : undefined;
 
   try {
