@@ -126,7 +126,7 @@ const STAGE_TINTS: Record<Status, string[]> = {
 
 // Left-edge accent per stage for extra visual separation.
 export const STAGE_ACCENT: Record<Status, string> = {
-  "To pick": "border-l-slate-400",
+  "To pick": "border-l-slate-300 dark:border-l-slate-600",
   Working: "border-l-blue-500",
   "In Review": "border-l-amber-500",
   Completed: "border-l-emerald-500",

@@ -144,16 +144,16 @@ export function TaskTable({
 
       <div className="overflow-x-auto rounded-xl border border-border bg-surface">
         <table className="w-full text-left text-sm">
-          <thead className="border-b border-border text-xs uppercase tracking-wide text-muted">
+          <thead className="border-b border-border bg-surface-2/40 text-xs uppercase tracking-wider text-muted">
             <tr>
-              <th className="px-4 py-2.5 font-medium">Task</th>
-              <th className="px-4 py-2.5 font-medium">Stage</th>
-              <th className="px-4 py-2.5 font-medium">Assignee</th>
-              <th className="px-4 py-2.5 font-medium">Priority</th>
-              <th className="px-4 py-2.5 font-medium">Effort</th>
-              <th className="px-4 py-2.5 font-medium">ETA</th>
-              <th className="px-4 py-2.5 font-medium">Delivered</th>
-              <th className="px-4 py-2.5"></th>
+              <th className="px-4 py-3 font-semibold">Task</th>
+              <th className="px-4 py-3 font-semibold">Stage</th>
+              <th className="px-4 py-3 font-semibold">Assignee</th>
+              <th className="px-4 py-3 font-semibold">Priority</th>
+              <th className="px-4 py-3 font-semibold">Effort</th>
+              <th className="px-4 py-3 font-semibold">ETA</th>
+              <th className="px-4 py-3 font-semibold">Delivered</th>
+              <th className="px-4 py-3"></th>
             </tr>
           </thead>
           <tbody>
@@ -165,57 +165,37 @@ export function TaskTable({
               </tr>
             )}
             {filtered.map((t) => (
-              <tr key={t.id} className="border-b border-border last:border-0 hover:bg-bg/60">
+              <tr key={t.id} className="border-b border-border last:border-0 transition-colors hover:bg-surface-2/40">
                 <td className="max-w-xs px-4 py-3">
-                  <div className="font-semibold text-fg">{t.title}</div>
-                  {t.tags.length > 0 && (
-                    <div className="mt-1 flex flex-wrap gap-1">
+                  <div className="text-[13px] font-semibold text-fg">{t.title}</div>
+                  {(t.program || t.track || t.tags.length > 0 || t.metrics.length > 0) && (
+                    <div className="mt-1.5 flex flex-wrap gap-1">
+                      {t.program && <TableChip label={t.program} tone="program" />}
+                      {t.track && <TableChip label={t.track} tone="track" />}
                       {t.tags.map((tg) => (
-                        <span key={tg} className="rounded-full bg-violet-100 px-1.5 py-0.5 text-[11px] font-medium text-violet-700 dark:bg-violet-950 dark:text-violet-300">
-                          #{tg}
-                        </span>
+                        <TableChip key={tg} label={`#${tg}`} tone="tag" />
                       ))}
-                    </div>
-                  )}
-                  {t.metrics.length > 0 && (
-                    <div className="mt-1 flex flex-wrap gap-1">
                       {t.metrics.map((m) => (
-                        <span key={m} className="rounded-full bg-cyan-100 px-1.5 py-0.5 text-[11px] font-medium text-cyan-700 dark:bg-cyan-950 dark:text-cyan-300">
-                          {m}
-                        </span>
+                        <TableChip key={m} label={m} tone="metric" />
                       ))}
-                    </div>
-                  )}
-                  {(t.program || t.track) && (
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      {t.program && (
-                        <span className="rounded bg-pink-100 px-1.5 py-0.5 text-[11px] font-medium text-pink-700 dark:bg-pink-950 dark:text-pink-300">
-                          {t.program}
-                        </span>
-                      )}
-                      {t.track && (
-                        <span className="rounded bg-teal-100 px-1.5 py-0.5 text-[11px] font-medium text-teal-700 dark:bg-teal-950 dark:text-teal-300">
-                          {t.track}
-                        </span>
-                      )}
                     </div>
                   )}
                   {(t.slack_link || t.sheet_link) && (
-                    <div className="mt-1 flex items-center gap-3">
+                    <div className="mt-1.5 flex items-center gap-3">
                       {t.slack_link && (
                         <a href={t.slack_link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[11px] font-medium text-accent hover:underline">
-                          <MessageSquare size={12} /> Slack
+                          <MessageSquare size={11} /> Slack
                         </a>
                       )}
                       {t.sheet_link && (
                         <a href={t.sheet_link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[11px] font-medium text-accent hover:underline">
-                          <FileSpreadsheet size={12} /> Sheet
+                          <FileSpreadsheet size={11} /> Sheet
                         </a>
                       )}
                     </div>
                   )}
                   {t.stakeholders && t.stakeholders.length > 0 && (
-                    <div className="mt-0.5 truncate text-xs text-muted">
+                    <div className="mt-1 truncate text-xs text-muted">
                       {t.stakeholders.map((s) => s.full_name ?? s.email).join(", ")}
                     </div>
                   )}
@@ -237,7 +217,7 @@ export function TaskTable({
                 <td className="px-4 py-3 text-muted">
                   {fmt(t.delivered_date)}
                   {isDelayed(t) && (
-                    <span className="ml-1.5 inline-flex items-center rounded-full bg-red-100 px-1.5 py-0.5 text-[11px] font-bold text-red-700 dark:bg-red-950 dark:text-red-300">
+                    <span className="ml-1.5 inline-flex items-center rounded border border-red-200 bg-red-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300">
                       Delayed
                     </span>
                   )}
@@ -251,5 +231,28 @@ export function TaskTable({
         </table>
       </div>
     </div>
+  );
+}
+
+// Row-level chip. Matches the kanban Chip look so the app reads as one design.
+const T_DOT: Record<"program" | "track" | "tag" | "metric", string> = {
+  program: "bg-pink-500",
+  track: "bg-teal-500",
+  tag: "bg-violet-500",
+  metric: "bg-cyan-500",
+};
+
+function TableChip({
+  label,
+  tone,
+}: {
+  label: string;
+  tone: "program" | "track" | "tag" | "metric";
+}) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-md border border-border bg-surface-2 px-1.5 py-0.5 text-[11px] font-medium text-fg/80">
+      <span className={`h-1.5 w-1.5 rounded-full ${T_DOT[tone]}`} />
+      {label}
+    </span>
   );
 }

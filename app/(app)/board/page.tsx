@@ -13,7 +13,7 @@ export default async function BoardPage() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-semibold tracking-tight">Board</h1>
+          <h1 className="text-xl font-bold tracking-tight">Board</h1>
           <p className="text-sm text-muted">Move work across stages. New tasks and status changes notify Slack.</p>
         </div>
         <TaskForm people={people} allTags={allTags} allMetrics={allMetrics} />

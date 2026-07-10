@@ -13,7 +13,7 @@ export default async function TasksPage() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-semibold tracking-tight">Tasks</h1>
+          <h1 className="text-xl font-bold tracking-tight">Tasks</h1>
           <p className="text-sm text-muted">{tasks.length} tasks · filter by stage, person, tag, or ETA.</p>
         </div>
         <TaskForm people={people} allTags={allTags} allMetrics={allMetrics} />

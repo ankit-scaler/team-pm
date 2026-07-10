@@ -3,21 +3,29 @@
 @tailwind utilities;
 
 :root {
-  --bg: 250 250 249;        /* warm off-white */
+  --bg: 249 250 251;        /* neutral cool white */
   --surface: 255 255 255;
-  --border: 231 229 228;
-  --fg: 28 28 30;
-  --muted: 113 113 122;
-  --accent: 84 87 229;      /* electric indigo */
+  --surface-2: 244 245 247; /* subtle sunken surface for chips */
+  --border: 226 229 233;
+  --border-strong: 209 213 219;
+  --fg: 17 24 39;           /* deep neutral, higher contrast */
+  --muted: 107 114 128;
+  --muted-2: 156 163 175;
+  --accent: 79 70 229;      /* indigo-600, professional */
+  --accent-soft: 238 242 255;
 }
 
 .dark {
-  --bg: 14 15 18;           /* near-black, faint blue */
-  --surface: 23 24 28;
-  --border: 39 40 46;
-  --fg: 237 237 240;
-  --muted: 148 148 158;
-  --accent: 129 131 248;
+  --bg: 15 17 21;
+  --surface: 24 27 33;
+  --surface-2: 32 36 44;
+  --border: 42 47 56;
+  --border-strong: 60 67 79;
+  --fg: 237 239 244;
+  --muted: 156 163 175;
+  --muted-2: 107 114 128;
+  --accent: 129 140 248;    /* indigo-400 in dark */
+  --accent-soft: 30 27 75;
 }
 
 * {

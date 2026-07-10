@@ -125,10 +125,8 @@ const KRS: KR[] = [
 
 // ─── Styles ─────────────────────────────────────────────────
 const METRIC_STYLE: Record<string, string> = {
-  Leading:
-    "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300",
-  Lagging:
-    "bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300",
+  Leading: "text-blue-700 dark:text-blue-300",
+  Lagging: "text-purple-700 dark:text-purple-300",
 };
 
 // ─── Page ───────────────────────────────────────────────────
@@ -139,7 +137,7 @@ export default function KRsPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-lg font-semibold tracking-tight">
+        <h1 className="text-xl font-bold tracking-tight">
           KR Framework — Instructor Team
         </h1>
         <p className="text-sm text-muted">
@@ -186,21 +184,22 @@ export default function KRsPage() {
 
 function KRCard({ kr }: { kr: KR }) {
   return (
-    <div className="rounded-xl border border-border bg-surface p-5 shadow-sm">
-      <div className="flex flex-wrap items-start justify-between gap-2">
+    <div className="rounded-xl border border-border bg-surface p-5 shadow-sm transition-shadow hover:shadow-md">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-center gap-2.5">
-          <span className="rounded-lg bg-accent px-2.5 py-1 text-xs font-bold text-white">
+          <span className="rounded-md bg-accent px-2 py-0.5 text-[11px] font-bold tracking-wide text-white">
             {kr.id}
           </span>
-          <h3 className="text-base font-bold text-fg">{kr.name}</h3>
+          <h3 className="text-base font-semibold text-fg">{kr.name}</h3>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <span
-            className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${METRIC_STYLE[kr.metricType] ?? ""}`}
+            className={`inline-flex items-center gap-1 rounded-md border border-border bg-surface-2 px-2 py-0.5 text-[11px] font-semibold ${METRIC_STYLE[kr.metricType] ?? ""}`}
           >
+            <span className={`h-1.5 w-1.5 rounded-full ${kr.metricType === "Leading" ? "bg-blue-500" : "bg-purple-500"}`} />
             {kr.metricType}
           </span>
-          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+          <span className="rounded-md border border-border bg-surface-2 px-2 py-0.5 text-[11px] font-medium text-muted">
             {kr.validFor}
           </span>
         </div>
@@ -208,8 +207,8 @@ function KRCard({ kr }: { kr: KR }) {
 
       <ul className="mt-4 space-y-2">
         {kr.points.map((point, i) => (
-          <li key={i} className="flex gap-2.5 text-sm leading-relaxed text-fg/85">
-            <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-accent/50" />
+          <li key={i} className="flex gap-2.5 text-[13px] leading-relaxed text-fg/85">
+            <span className="mt-[7px] h-1 w-1 flex-shrink-0 rounded-full bg-accent" />
             <span>{point}</span>
           </li>
         ))}

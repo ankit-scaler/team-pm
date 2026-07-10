@@ -11,7 +11,7 @@ export default async function ProgramTrackPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-lg font-semibold tracking-tight">Program · Track</h1>
+        <h1 className="text-xl font-bold tracking-tight">Program · Track</h1>
         <p className="text-sm text-muted">
           Filter all tasks by program and track. Add a date range to narrow further.
         </p>

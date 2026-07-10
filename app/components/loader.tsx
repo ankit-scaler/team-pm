@@ -15,12 +15,12 @@ export function Loader({ className = "" }: { className?: string }) {
   const [line] = useState(() => LOADER_LINES[Math.floor(Math.random() * LOADER_LINES.length)]);
 
   return (
-    <div className={`flex flex-col items-center justify-center gap-3 py-20 ${className}`}>
+    <div className={`flex flex-col items-center justify-center gap-4 py-20 ${className}`}>
       <span
-        className="h-7 w-7 animate-spin rounded-full border-2 border-border border-t-accent"
+        className="h-8 w-8 animate-spin rounded-full border-[2.5px] border-border border-t-accent"
         aria-hidden="true"
       />
-      <p className="text-xs font-bold tracking-wide text-muted">{line}</p>
+      <p className="text-xs font-semibold tracking-wide text-muted">{line}</p>
     </div>
   );
 }

@@ -9,8 +9,8 @@ import { Loader } from "./loader";
 import { STATUSES, EFFORTS, PRIORITIES, PROGRAMS, TRACKS, type Profile, type Task } from "@/lib/types";
 
 const fieldCls =
-  "w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-accent";
-const labelCls = "mb-1 block text-xs font-medium text-muted";
+  "w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-fg outline-none transition-colors focus:border-accent hover:border-border-strong";
+const labelCls = "mb-1 block text-[11px] font-semibold uppercase tracking-wide text-muted";
 
 export function TaskForm({
   people,
@@ -66,7 +66,7 @@ export function TaskForm({
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3.5 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:opacity-90 hover:shadow"
         >
           <Plus size={16} /> New task
         </button>
@@ -286,7 +286,7 @@ export function TaskForm({
                   <button
                     type="submit"
                     disabled={pending}
-                    className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+                    className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:opacity-90 hover:shadow disabled:opacity-60"
                   >
                     {pending ? "Saving…" : isEdit ? "Save changes" : "Create task"}
                   </button>

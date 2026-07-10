@@ -38,7 +38,7 @@ export function PeopleReport({ tasks, people }: { tasks: Task[]; people: Profile
       .sort((a, b) => b.open - a.open || b.total - a.total);
   }, [tasks, people, from, to, personId]);
 
-  const inputCls = "rounded-lg border border-border bg-surface px-2.5 py-1.5 text-sm outline-none";
+  const inputCls = "rounded-lg border border-border bg-surface px-2.5 py-1.5 text-sm text-fg outline-none transition-colors focus:border-accent hover:border-border-strong";
 
   return (
     <div className="space-y-4">
@@ -75,14 +75,14 @@ export function PeopleReport({ tasks, people }: { tasks: Task[]; people: Profile
 
       <div className="overflow-x-auto rounded-xl border border-border bg-surface">
         <table className="w-full text-left text-sm">
-          <thead className="border-b border-border text-xs uppercase tracking-wide text-muted">
+          <thead className="border-b border-border bg-surface-2/40 text-xs uppercase tracking-wider text-muted">
             <tr>
-              <th className="px-4 py-2.5 font-medium">Person</th>
-              <th className="px-4 py-2.5 text-center font-medium">Picked</th>
-              <th className="px-4 py-2.5 text-center font-medium">Closed</th>
-              <th className="px-4 py-2.5 text-center font-medium">In progress</th>
-              <th className="px-4 py-2.5 text-center font-medium">To pick</th>
-              <th className="px-4 py-2.5 text-center font-medium">Total</th>
+              <th className="px-4 py-3 font-semibold">Person</th>
+              <th className="px-4 py-3 text-center font-semibold">Picked</th>
+              <th className="px-4 py-3 text-center font-semibold">Closed</th>
+              <th className="px-4 py-3 text-center font-semibold">In progress</th>
+              <th className="px-4 py-3 text-center font-semibold">To pick</th>
+              <th className="px-4 py-3 text-center font-semibold">Total</th>
             </tr>
           </thead>
           <tbody>
@@ -94,7 +94,7 @@ export function PeopleReport({ tasks, people }: { tasks: Task[]; people: Profile
               </tr>
             )}
             {rows.map((r) => (
-              <tr key={r.profile.id} className="border-b border-border last:border-0 hover:bg-bg/60">
+              <tr key={r.profile.id} className="border-b border-border last:border-0 transition-colors hover:bg-surface-2/40">
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2">
                     {r.profile.avatar_url ? (

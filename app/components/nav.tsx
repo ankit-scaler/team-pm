@@ -41,20 +41,23 @@ export function Nav({ profile }: { profile: Profile }) {
           </span>
         </Link>
 
-        <nav className="ml-2 flex items-center gap-1">
+        <nav className="ml-2 flex items-center gap-0.5">
           {links.map((l) => {
             const active = pathname === l.href || pathname.startsWith(l.href + "/");
             return (
               <Link
                 key={l.href}
                 href={l.href}
-                className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
+                className={`relative rounded-md px-3 py-1.5 text-sm transition-colors ${
                   active
-                    ? "bg-surface font-medium text-fg shadow-sm"
-                    : "text-muted hover:text-fg"
+                    ? "font-semibold text-fg"
+                    : "font-medium text-muted hover:bg-surface-2 hover:text-fg"
                 }`}
               >
                 {l.label}
+                {active && (
+                  <span className="absolute inset-x-2.5 -bottom-[15px] h-0.5 rounded-full bg-accent" />
+                )}
               </Link>
             );
           })}

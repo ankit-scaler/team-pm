@@ -25,15 +25,15 @@ function LoginInner() {
     <main className="grid min-h-screen place-items-center px-6">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-xl bg-accent text-lg font-semibold text-white">
-            PM
+          <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-xl bg-accent text-lg font-bold text-white shadow-sm">
+            Scaler
           </div>
-          <h1 className="text-xl font-semibold tracking-tight">Team PM</h1>
+          <h1 className="text-xl font-semibold tracking-tight">Instructor team Task Manager</h1>
           <p className="mt-1 text-sm text-muted">Sign in to manage the team's work</p>
         </div>
 
         {error === "domain" && (
-          <div className="mb-4 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300">
+          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
             That email isn't on an approved domain. Use your work account to sign in.
           </div>
         )}
@@ -42,7 +42,7 @@ function LoginInner() {
           type="button"
           onClick={signIn}
           disabled={loading}
-          className="flex w-full items-center justify-center gap-3 rounded-lg border border-border bg-surface px-4 py-3 text-sm font-medium transition-colors hover:bg-bg disabled:opacity-60"
+          className="flex w-full items-center justify-center gap-3 rounded-lg border border-border bg-surface px-4 py-3 text-sm font-semibold text-fg transition-colors hover:border-border-strong hover:bg-surface-2 disabled:opacity-60"
         >
           <GoogleIcon />
           {loading ? "Redirecting…" : "Continue with Google"}

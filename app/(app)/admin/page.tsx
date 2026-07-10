@@ -26,7 +26,7 @@ export default async function AdminPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-lg font-semibold tracking-tight">Admin</h1>
+        <h1 className="text-xl font-bold tracking-tight">Admin</h1>
         <p className="text-sm text-muted">Manage who can access the workspace and who's an admin.</p>
       </div>
       <AdminUsers users={people} currentUserId={user.id} />

@@ -9,7 +9,7 @@ export default async function PeoplePage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-lg font-semibold tracking-tight">People</h1>
+        <h1 className="text-xl font-bold tracking-tight">People</h1>
         <p className="text-sm text-muted">Who picked up and closed what, over any date range.</p>
       </div>
       <PeopleReport tasks={tasks} people={people} />
