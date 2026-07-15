@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { notifyStatusChange } from "@/lib/slack";
+import { syncTaskCalendarEvent, deleteTaskCalendarEvent } from "@/lib/google";
 import type { Status } from "@/lib/types";
 
 function appUrl(): string {
@@ -49,6 +50,14 @@ function parseMultiValue(formData: FormData, field: string): string[] {
   return out;
 }
 
+// Look up the emails for a set of profile ids (used for calendar attendees).
+async function emailsForProfiles(ids: string[]): Promise<string[]> {
+  if (ids.length === 0) return [];
+  const supabase = createClient();
+  const { data } = await supabase.from("profiles").select("email").in("id", ids);
+  return (data ?? []).map((r: any) => r.email).filter(Boolean);
+}
+
 async function syncStakeholders(taskId: string, ids: string[]) {
   const supabase = createClient();
   await supabase.from("task_stakeholders").delete().eq("task_id", taskId);
@@ -92,6 +101,23 @@ export async function createTask(formData: FormData) {
 
   await syncStakeholders(task.id, stakeholderIds);
 
+  // Task 1: block the stakeholders' calendars from today until the ETA.
+  const eta = str(formData.get("eta"));
+  if (eta) {
+    const emails = await emailsForProfiles(stakeholderIds);
+    const eventId = await syncTaskCalendarEvent({
+      taskId: task.id,
+      creatorId: me.id,
+      title: task.title,
+      eta,
+      existingEventId: null,
+      stakeholderEmails: emails,
+    });
+    if (eventId) {
+      await supabase.from("tasks").update({ calendar_event_id: eventId }).eq("id", task.id);
+    }
+  }
+
   // Look up assignee name for the Slack message (if assigned to someone)
   const assigneeId = str(formData.get("assignee_id"));
   let assigneeName: string | null = null;
@@ -125,7 +151,7 @@ export async function updateTask(taskId: string, formData: FormData) {
 
   const { data: before } = await supabase
     .from("tasks")
-    .select("status, title")
+    .select("status, title, created_by, calendar_event_id")
     .eq("id", taskId)
     .single();
 
@@ -155,6 +181,29 @@ export async function updateTask(taskId: string, formData: FormData) {
   if (error) throw new Error(error.message);
 
   await syncStakeholders(taskId, stakeholderIds);
+
+  // Task 1: keep the calendar block in sync with the ETA / completion.
+  const newEta = str(formData.get("eta"));
+  const newTitle = str(formData.get("title")) ?? before?.title ?? "Untitled task";
+  if (newStatus === "Completed") {
+    if (before?.calendar_event_id) {
+      await deleteTaskCalendarEvent(before.created_by ?? null, before.calendar_event_id);
+      await supabase.from("tasks").update({ calendar_event_id: null }).eq("id", taskId);
+    }
+  } else {
+    const emails = await emailsForProfiles(stakeholderIds);
+    const eventId = await syncTaskCalendarEvent({
+      taskId,
+      creatorId: before?.created_by ?? me.id,
+      title: newTitle,
+      eta: newEta,
+      existingEventId: before?.calendar_event_id ?? null,
+      stakeholderEmails: emails,
+    });
+    if ((eventId ?? null) !== (before?.calendar_event_id ?? null)) {
+      await supabase.from("tasks").update({ calendar_event_id: eventId }).eq("id", taskId);
+    }
+  }
 
   if (before && before.status !== newStatus) {
     await notifyStatusChange({
@@ -210,8 +259,20 @@ export async function changeStatus(taskId: string, newStatus: Status) {
 
 export async function deleteTask(taskId: string) {
   const supabase = createClient();
+  const { data: before } = await supabase
+    .from("tasks")
+    .select("created_by, calendar_event_id")
+    .eq("id", taskId)
+    .single();
+
   const { error } = await supabase.from("tasks").delete().eq("id", taskId);
   if (error) throw new Error(error.message);
+
+  // Task 1: remove any calendar block for this task.
+  if (before?.calendar_event_id) {
+    await deleteTaskCalendarEvent(before.created_by ?? null, before.calendar_event_id);
+  }
+
   revalidatePath("/board");
   revalidatePath("/tasks");
   revalidatePath("/people");

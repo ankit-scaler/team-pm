@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { DEFAULT_METRICS, type Profile, type Task } from "@/lib/types";
+import { DEFAULT_METRICS, type AdhocRequest, type Profile, type Task } from "@/lib/types";
 
 const PROFILE_COLS = "id, email, full_name, avatar_url, role";
 
@@ -41,6 +41,22 @@ export async function getTasks(): Promise<Task[]> {
       .map((s: any) => s.profile)
       .filter(Boolean),
   })) as Task[];
+}
+
+export async function getAdhocRequests(): Promise<AdhocRequest[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("adhoc_requests")
+    .select(
+      "id, slack_ts, permalink, posted_at, raised_by, program, batch, module, beneficiary, problem, learners_impact, risk_if_not_done, outcome, module_owner, stakeholder"
+    )
+    .order("posted_at", { ascending: false, nullsFirst: false });
+
+  if (error) {
+    console.error("getAdhocRequests:", error.message);
+    return [];
+  }
+  return (data as AdhocRequest[]) ?? [];
 }
 
 // Distinct tags already used across all tasks — powers tag autocomplete.

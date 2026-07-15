@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { isCalendarConnected } from "@/lib/google";
 import { Nav } from "../components/nav";
 import { Footer } from "../components/footer";
 import type { Profile } from "@/lib/types";
@@ -31,9 +32,11 @@ export default async function AppLayout({
       role: "member",
     };
 
+  const calendarConnected = await isCalendarConnected(user.id);
+
   return (
     <div className="flex min-h-screen flex-col">
-      <Nav profile={safeProfile} />
+      <Nav profile={safeProfile} calendarConnected={calendarConnected} />
       <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6">{children}</main>
       <Footer />
     </div>
