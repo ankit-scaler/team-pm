@@ -56,6 +56,9 @@ export const KR_STATUSES = ["On track", "At risk", "Behind", "Achieved"] as cons
 export type AdhocRequest = {
   id: string;
   source: "slack" | "manual";
+  status: Status;
+  eta: string | null;
+  delivered_date: string | null;
   slack_ts: string | null;
   permalink: string | null;
   title: string | null;

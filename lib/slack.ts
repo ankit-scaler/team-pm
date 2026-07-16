@@ -146,10 +146,11 @@ function parseBracketNames(text: string): string[] {
 }
 
 // Resolve the bracketed names in `text` to Slack user ids, deduped.
-async function mentionIdsFromText(text: string): Promise<string[]> {
+async function resolveMentionIds(tagNames: string[] | undefined, text: string): Promise<string[]> {
   const channel = statusChannel();
   if (!channel) return [];
-  const names = parseBracketNames(text);
+  // Prefer explicit people to tag; otherwise fall back to names in (brackets).
+  const names = tagNames && tagNames.length > 0 ? tagNames : parseBracketNames(text);
   if (names.length === 0) return [];
   const members = await getChannelMembers(channel);
   if (members.length === 0) return [];
@@ -172,8 +173,11 @@ function sectionBlocks(text: string, link?: string) {
   ];
 }
 
-// Post a message and, if it names people in brackets, tag them in a threaded reply.
-async function deliver(text: string, link?: string): Promise<void> {
+// Post a message and tag the relevant people in a threaded reply.
+async function deliver(
+  text: string,
+  opts: { link?: string; tagNames?: string[] } = {}
+): Promise<void> {
   const channel = statusChannel();
 
   // Preferred path: bot token + Web API (enables threading + mentions).
@@ -182,12 +186,12 @@ async function deliver(text: string, link?: string): Promise<void> {
       const posted = await slackApi("chat.postMessage", {
         channel,
         text,
-        blocks: sectionBlocks(text, link),
+        blocks: sectionBlocks(text, opts.link),
       });
       const ts = posted?.ts;
       if (!ts) return;
 
-      const ids = await mentionIdsFromText(text);
+      const ids = await resolveMentionIds(opts.tagNames, text);
       if (ids.length > 0) {
         await slackApi("chat.postMessage", {
           channel,
@@ -208,7 +212,7 @@ async function deliver(text: string, link?: string): Promise<void> {
     await fetch(webhook, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text, blocks: sectionBlocks(text, link) }),
+      body: JSON.stringify({ text, blocks: sectionBlocks(text, opts.link) }),
     });
   } catch (e) {
     console.error("Slack webhook failed:", e);
@@ -231,18 +235,23 @@ export async function notifyStatusChange(p: StatusChangePayload): Promise<void> 
   const link = p.appUrl ? `${p.appUrl}/tasks` : undefined;
 
   let text: string;
+  let tagNames: string[] = [];
   if (p.oldStatus) {
+    // Status change ("moved") — no @-mention (per the agreed rules).
     text = `${STATUS_EMOJI[p.newStatus]} *${p.taskTitle}* moved *${p.oldStatus}* → *${p.newStatus}* by ${p.actorName}`;
   } else if (p.assigneeName && p.assigneeName !== p.actorName) {
-    // Bracketed assignee so it gets @-mentioned in the thread.
-    text = `🆕 *${p.taskTitle}* raised by *${p.actorName}* → assigned to *${p.assigneeName}* (${p.assigneeName})`;
+    // New task raised for someone else → tag BOTH the raiser and the assignee.
+    text = `🆕 *${p.taskTitle}* raised by *${p.actorName}* → assigned to *${p.assigneeName}* (status: *${p.newStatus}*)`;
+    tagNames = [p.actorName, p.assigneeName];
   } else if (p.assigneeName) {
-    text = `🆕 *${p.taskTitle}* added by *${p.actorName}* (${p.assigneeName})`;
+    text = `🆕 *${p.taskTitle}* added by *${p.actorName}* (status: *${p.newStatus}*)`;
+    tagNames = [p.actorName];
   } else {
-    text = `🆕 *${p.taskTitle}* raised by *${p.actorName}* (unassigned)`;
+    text = `🆕 *${p.taskTitle}* raised by *${p.actorName}* (unassigned, status: *${p.newStatus}*)`;
+    tagNames = [p.actorName];
   }
 
-  await deliver(text, link);
+  await deliver(text, { link, tagNames });
 }
 
 type OverdueItem = { title: string; eta: string; assignee: string | null };
@@ -253,7 +262,8 @@ export async function notifyOverdue(items: OverdueItem[], appUrl?: string): Prom
     .map((i) => `• *${i.title}* — ETA ${i.eta}${i.assignee ? ` (${i.assignee})` : ""}`)
     .join("\n");
   const header = `🆘⏰ *${items.length} task${items.length > 1 ? "s" : ""} past ETA and not completed*`;
-  await deliver(`${header}\n${lines}`, appUrl ? `${appUrl}/tasks` : undefined);
+  const tagNames = items.map((i) => i.assignee).filter(Boolean) as string[];
+  await deliver(`${header}\n${lines}`, { link: appUrl ? `${appUrl}/tasks` : undefined, tagNames });
 }
 
 export async function notifyDueSoon(items: OverdueItem[], appUrl?: string): Promise<void> {
@@ -262,5 +272,6 @@ export async function notifyDueSoon(items: OverdueItem[], appUrl?: string): Prom
     .map((i) => `• *${i.title}* — ETA ${i.eta}${i.assignee ? ` (${i.assignee})` : ""}`)
     .join("\n");
   const header = `🆘📅 *${items.length} task${items.length > 1 ? "s" : ""} due tomorrow*`;
-  await deliver(`${header}\n${lines}`, appUrl ? `${appUrl}/tasks` : undefined);
+  const tagNames = items.map((i) => i.assignee).filter(Boolean) as string[];
+  await deliver(`${header}\n${lines}`, { link: appUrl ? `${appUrl}/tasks` : undefined, tagNames });
 }

@@ -36,9 +36,9 @@ export function Nav({
           {logoOk ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src="/scaler-logo.png"
+              src="/scaler-logo.svg"
               alt="Scaler"
-              className="h-7 w-auto"
+              className="h-6 w-auto dark:brightness-0 dark:invert"
               onError={() => setLogoOk(false)}
             />
           ) : (

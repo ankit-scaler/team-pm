@@ -2,6 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { MessageSquare, Slack } from "lucide-react";
+import { StatusBadge } from "./status-badge";
+import { AdhocDeleteButton } from "./adhoc-delete-button";
+import { AdhocForm } from "./adhoc-form";
 import { PROGRAMS, type AdhocRequest } from "@/lib/types";
 
 const selCls = "rounded-lg border border-border bg-surface px-2.5 py-1.5 text-sm outline-none";
@@ -84,12 +87,13 @@ export function AdhocList({ requests }: { requests: AdhocRequest[] }) {
               <th className="px-4 py-3 font-semibold">Stakeholder</th>
               <th className="px-4 py-3 font-semibold">Raised by</th>
               <th className="px-4 py-3 font-semibold">Date</th>
+              <th className="px-4 py-3"></th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-10 text-center text-muted">
+                <td colSpan={8} className="px-4 py-10 text-center text-muted">
                   {requests.length === 0
                     ? "No adhoc requests yet. Add one with “+ Adhoc”, or they’ll appear here from #instructor-adhoc-request-1."
                     : "No requests match these filters."}
@@ -100,8 +104,10 @@ export function AdhocList({ requests }: { requests: AdhocRequest[] }) {
               <tr key={r.id} className="border-b border-border last:border-0 align-top transition-colors hover:bg-surface-2/40">
                 <td className="max-w-md px-4 py-3">
                   <div className="text-[13px] font-semibold text-fg">{displayTitle(r)}</div>
-                  <div className="mt-1.5 flex flex-wrap gap-1">
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1">
+                    <StatusBadge status={r.status} />
                     <SourceBadge source={r.source} />
+                    {needsTriage(r) && <TriageBadge />}
                     {r.program && <Chip label={r.program} tone="program" />}
                     {r.batch && <Chip label={r.batch} tone="track" />}
                   </div>
@@ -129,13 +135,41 @@ export function AdhocList({ requests }: { requests: AdhocRequest[] }) {
                 <td className="px-4 py-3">{r.module_owner ?? <span className="text-muted">—</span>}</td>
                 <td className="px-4 py-3">{r.stakeholder ?? <span className="text-muted">—</span>}</td>
                 <td className="px-4 py-3 text-muted">{r.raised_by ?? "—"}</td>
-                <td className="px-4 py-3 text-muted">{fmt(r.posted_at ?? r.created_at)}</td>
+                <td className="px-4 py-3 text-muted">
+                  {fmt(r.posted_at ?? r.created_at)}
+                  {r.eta && <div className="text-[11px]">ETA {fmt(r.eta)}</div>}
+                  {r.status === "Completed" && r.delivered_date && (
+                    <div className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
+                      Delivered {fmt(r.delivered_date)}
+                    </div>
+                  )}
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center justify-end gap-1">
+                    <AdhocForm request={r} />
+                    <AdhocDeleteButton id={r.id} />
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
     </div>
+  );
+}
+
+// A Slack-fed request arrives without an ETA, so it's incomplete until someone
+// edits it to add one.
+export function needsTriage(r: AdhocRequest): boolean {
+  return r.source === "slack" && !r.eta;
+}
+
+function TriageBadge() {
+  return (
+    <span className="inline-flex items-center rounded-md border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-700 dark:border-amber-900 dark:bg-amber-950/50 dark:text-amber-300">
+      Incomplete
+    </span>
   );
 }
 
