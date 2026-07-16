@@ -47,41 +47,53 @@ type Member = { id: string; names: string[] };
 let membersCache: { at: number; channel: string; members: Member[] } | null = null;
 const MEMBERS_TTL = 10 * 60 * 1000; // 10 min
 
+// Slack's read methods (conversations.members, users.info) reject a JSON body —
+// they must be called with query params, so use GET. (chat.postMessage, below,
+// keeps using slackApi/JSON, which it does support.)
+async function slackGet(method: string, params: Record<string, string | number>): Promise<any> {
+  const qs = new URLSearchParams(
+    Object.entries(params).map(([k, v]) => [k, String(v)])
+  ).toString();
+  const res = await fetch(`https://slack.com/api/${method}?${qs}`, {
+    headers: { Authorization: `Bearer ${botToken()}` },
+  });
+  const json = await res.json();
+  if (!json.ok) console.error(`Slack ${method} failed:`, json.error);
+  return json;
+}
+
 async function getChannelMembers(channel: string): Promise<Member[]> {
   if (membersCache && membersCache.channel === channel && Date.now() - membersCache.at < MEMBERS_TTL) {
     return membersCache.members;
   }
   if (!botToken()) return [];
 
-  // Who's in the channel?
-  const ids = new Set<string>();
+  // Who's in the channel? (GET — this read method rejects a JSON body.)
+  const ids: string[] = [];
   let cursor: string | undefined;
   do {
-    const r = await slackApi("conversations.members", {
+    const r = await slackGet("conversations.members", {
       channel,
       limit: 200,
       ...(cursor ? { cursor } : {}),
     });
     if (!r.ok) break;
-    (r.members ?? []).forEach((id: string) => ids.add(id));
+    ids.push(...((r.members as string[]) ?? []));
     cursor = r.response_metadata?.next_cursor || undefined;
   } while (cursor);
 
-  // Their display names.
+  // Resolve each member's names via users.info — bounded by channel size, so we
+  // avoid paginating the whole workspace with users.list (slow / rate-limited).
   const members: Member[] = [];
-  cursor = undefined;
-  do {
-    const r = await slackApi("users.list", { limit: 200, ...(cursor ? { cursor } : {}) });
-    if (!r.ok) break;
-    for (const u of r.members ?? []) {
-      if (!ids.has(u.id) || u.deleted || u.is_bot) continue;
-      const p = u.profile ?? {};
-      const names = [u.real_name, p.real_name, p.display_name, p.display_name_normalized, u.name]
-        .filter(Boolean) as string[];
-      members.push({ id: u.id, names });
-    }
-    cursor = r.response_metadata?.next_cursor || undefined;
-  } while (cursor);
+  for (const id of ids) {
+    const r = await slackGet("users.info", { user: id });
+    const u = r.user;
+    if (!r.ok || !u || u.deleted || u.is_bot) continue;
+    const p = u.profile ?? {};
+    const names = [u.real_name, p.real_name, p.display_name, p.display_name_normalized, u.name]
+      .filter(Boolean) as string[];
+    members.push({ id, names });
+  }
 
   membersCache = { at: Date.now(), channel, members };
   return members;
