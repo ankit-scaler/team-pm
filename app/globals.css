@@ -2,17 +2,18 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Scaler 3.0 palette — premium, light, editorial. */
 :root {
-  --bg: 249 250 251;        /* neutral cool white */
-  --surface: 255 255 255;
-  --surface-2: 244 245 247; /* subtle sunken surface for chips */
-  --border: 226 229 233;
-  --border-strong: 209 213 219;
-  --fg: 17 24 39;           /* deep neutral, higher contrast */
-  --muted: 107 114 128;
-  --muted-2: 156 163 175;
-  --accent: 79 70 229;      /* indigo-600, professional */
-  --accent-soft: 238 242 255;
+  --bg: 252 252 252;        /* #FCFCFC off-white (not pure white) */
+  --surface: 255 255 255;   /* #FFFFFF cards */
+  --surface-2: 246 246 246; /* #F6F6F6 panels / sunken chips */
+  --border: 209 209 209;    /* #D1D1D1 neutral card border */
+  --border-strong: 196 196 196; /* #C4C4C4 */
+  --fg: 11 21 41;           /* #0B1529 dark navy-black body text */
+  --muted: 105 105 105;     /* #696969 secondary text */
+  --muted-2: 132 132 132;   /* #848484 tertiary / eyebrow labels */
+  --accent: 0 85 255;       /* #0055FF Scaler brand blue */
+  --accent-soft: 233 241 255; /* #E9F1FF ice tint */
 }
 
 .dark {
@@ -24,8 +25,8 @@
   --fg: 237 239 244;
   --muted: 156 163 175;
   --muted-2: 107 114 128;
-  --accent: 129 140 248;    /* indigo-400 in dark */
-  --accent-soft: 30 27 75;
+  --accent: 92 156 255;     /* lightened Scaler blue for dark surfaces */
+  --accent-soft: 15 32 66;
 }
 
 * {
@@ -37,6 +38,12 @@ body {
   color: rgb(var(--fg));
   -webkit-font-smoothing: antialiased;
   font-feature-settings: "tnum" 1; /* tabular numerals for dates/counts */
+  letter-spacing: -0.011em; /* subtle negative tracking — Scaler 3.0 editorial feel */
+}
+
+/* Page-level headings get a touch tighter tracking for a premium, editorial look. */
+h1 {
+  letter-spacing: -0.02em;
 }
 
 /* Respect reduced motion */

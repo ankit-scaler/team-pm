@@ -4,12 +4,15 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight, MessageSquare, FileSpreadsheet } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { changeStatus } from "../(app)/actions";
+import { changeStatus, changeAdhocStatus } from "../(app)/actions";
 import { TaskForm } from "./task-form";
+import { AdhocDeleteButton } from "./adhoc-delete-button";
+import { AdhocForm } from "./adhoc-form";
 import { StatusBadge, PriorityLabel, EffortChip } from "./status-badge";
 import {
   STATUSES,
   STAGE_ACCENT,
+  type AdhocRequest,
   type Profile,
   type Status,
   type Task,
@@ -27,11 +30,13 @@ function fmt(d: string | null) {
 export function KanbanBoard({
   tasks,
   people,
+  adhocRequests = [],
   allTags = [],
   allMetrics = [],
 }: {
   tasks: Task[];
   people: Profile[];
+  adhocRequests?: AdhocRequest[];
   allTags?: string[];
   allMetrics?: string[];
 }) {
@@ -65,6 +70,23 @@ export function KanbanBoard({
     });
   }, [tasks, assignee, tag, q]);
 
+  // Adhoc requests appear on the board too, in their status column. They have no
+  // assignee/tags, so the person/tag filters simply hide them.
+  const visibleAdhoc = useMemo(() => {
+    if (tag) return [];
+    if (assignee && assignee !== "unassigned") return [];
+    return adhocRequests.filter((a) => {
+      if (q) {
+        const hay = [a.title, a.module, a.program, a.raised_by]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        if (!hay.includes(q.toLowerCase())) return false;
+      }
+      return true;
+    });
+  }, [adhocRequests, assignee, tag, q]);
+
   const anyFilter = assignee || tag || q;
 
   function move(task: Task, dir: -1 | 1) {
@@ -72,6 +94,13 @@ export function KanbanBoard({
     const next = STATUSES[idx + dir];
     if (!next) return;
     startTransition(() => changeStatus(task.id, next as Status));
+  }
+
+  function moveAdhoc(a: AdhocRequest, dir: -1 | 1) {
+    const idx = STATUSES.indexOf(a.status);
+    const next = STATUSES[idx + dir];
+    if (!next) return;
+    startTransition(() => changeAdhocStatus(a.id, next as Status));
   }
 
   const selCls = "rounded-lg border border-border bg-surface px-2.5 py-1.5 text-sm text-fg outline-none transition-colors focus:border-accent hover:border-border-strong";
@@ -118,19 +147,28 @@ export function KanbanBoard({
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         {STATUSES.map((col) => {
           const items = visible.filter((t) => t.status === col);
+          const adhocItems = visibleAdhoc.filter((a) => a.status === col);
           return (
             <section key={col} className="flex flex-col rounded-xl border border-border bg-surface/40">
               <header className="flex items-center justify-between border-b border-border px-3 py-2.5">
                 <StatusBadge status={col} />
                 <span className="rounded-md bg-surface-2 px-1.5 py-0.5 text-xs font-semibold text-muted">
-                  {items.length}
+                  {items.length + adhocItems.length}
                 </span>
               </header>
 
               <div className="flex-1 space-y-2 p-2">
-                {items.length === 0 && (
+                {items.length === 0 && adhocItems.length === 0 && (
                   <p className="px-1 py-6 text-center text-xs text-muted">Nothing here</p>
                 )}
+                {adhocItems.map((a) => (
+                  <AdhocCard
+                    key={a.id}
+                    a={a}
+                    col={col}
+                    onMove={moveAdhoc}
+                  />
+                ))}
                 {items.map((t) => (
                   <article
                     key={t.id}
@@ -267,6 +305,118 @@ export function KanbanBoard({
         })}
       </div>
     </div>
+  );
+}
+
+// Adhoc request rendered as a board card — badged "Adhoc", movable across stages.
+function AdhocCard({
+  a,
+  col,
+  onMove,
+}: {
+  a: AdhocRequest;
+  col: Status;
+  onMove: (a: AdhocRequest, dir: -1 | 1) => void;
+}) {
+  const title = a.title || a.module || a.program || "Adhoc request";
+  return (
+    <article
+      className={`group rounded-lg border border-l-[3px] border-border ${STAGE_ACCENT[col]} bg-surface p-3.5 shadow-sm transition-shadow hover:shadow-md`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <h3 className="text-[13px] font-semibold leading-snug text-fg">{title}</h3>
+        <div className="flex shrink-0 items-center gap-1">
+          <span className="inline-flex items-center rounded-md border border-accent/30 bg-accent/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent">
+            Adhoc
+          </span>
+          <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+            <AdhocForm
+              request={a}
+              triggerClassName="grid h-6 w-6 place-items-center rounded text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+            />
+            <AdhocDeleteButton
+              id={a.id}
+              className="grid h-6 w-6 place-items-center rounded text-muted transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50 dark:hover:bg-red-950/40 dark:hover:text-red-400"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-muted">
+        {a.source === "slack" && !a.eta && (
+          <span className="inline-flex items-center rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:border-amber-900 dark:bg-amber-950/50 dark:text-amber-300">
+            Incomplete
+          </span>
+        )}
+        {a.eta && <span className="font-medium">ETA {fmt(a.eta)}</span>}
+        {a.status === "Completed" && a.delivered_date && (
+          <>
+            {a.eta && <span aria-hidden className="text-muted-2">·</span>}
+            <span className="font-medium text-emerald-700 dark:text-emerald-400">
+              Delivered {fmt(a.delivered_date)}
+            </span>
+          </>
+        )}
+        {a.learners_impact && (
+          <>
+            <span aria-hidden className="text-muted-2">·</span>
+            <span>{a.learners_impact} learners</span>
+          </>
+        )}
+      </div>
+
+      {(a.program || a.batch) && (
+        <div className="mt-2.5 flex flex-wrap gap-1">
+          {a.program && <Chip label={a.program} tone="program" />}
+          {a.batch && <Chip label={a.batch} tone="track" />}
+        </div>
+      )}
+
+      {a.permalink && (
+        <div className="mt-2.5">
+          <a
+            href={a.permalink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-[11px] font-medium text-accent hover:underline"
+          >
+            <MessageSquare size={11} /> Slack
+          </a>
+        </div>
+      )}
+
+      <div className="mt-3 flex items-center justify-between border-t border-border pt-2.5">
+        <span className="truncate text-xs text-muted">
+          {a.raised_by ? (
+            <>
+              Raised by <span className="font-medium text-fg/70">{a.raised_by}</span>
+            </>
+          ) : (
+            "Adhoc request"
+          )}
+        </span>
+        <div className="flex items-center gap-0.5">
+          <button
+            type="button"
+            onClick={() => onMove(a, -1)}
+            disabled={STATUSES.indexOf(a.status) === 0}
+            className="grid h-6 w-6 place-items-center rounded text-muted hover:bg-surface-2 hover:text-fg disabled:opacity-25"
+            aria-label="Move back"
+          >
+            <ChevronLeft size={14} />
+          </button>
+          <button
+            type="button"
+            onClick={() => onMove(a, 1)}
+            disabled={STATUSES.indexOf(a.status) === STATUSES.length - 1}
+            className="grid h-6 w-6 place-items-center rounded text-muted hover:bg-surface-2 hover:text-fg disabled:opacity-25"
+            aria-label="Move forward"
+          >
+            <ChevronRight size={14} />
+          </button>
+        </div>
+      </div>
+    </article>
   );
 }
 

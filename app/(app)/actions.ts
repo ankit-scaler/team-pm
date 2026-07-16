@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { notifyStatusChange } from "@/lib/slack";
+import { syncTaskCalendarEvent, deleteTaskCalendarEvent } from "@/lib/google";
 import type { Status } from "@/lib/types";
 
 function appUrl(): string {
@@ -49,6 +50,46 @@ function parseMultiValue(formData: FormData, field: string): string[] {
   return out;
 }
 
+// Look up the emails for a set of profile ids (used for calendar attendees).
+async function emailsForProfiles(ids: string[]): Promise<string[]> {
+  if (ids.length === 0) return [];
+  const supabase = createClient();
+  const { data } = await supabase.from("profiles").select("email").in("id", ids);
+  return (data ?? []).map((r: any) => r.email).filter(Boolean);
+}
+
+// Fuzzy-match free-text names (adhoc stakeholder / module owner) to team
+// members and return their emails. Only returns confident matches (>= half the
+// name's tokens overlap), so a bad name resolves to no one rather than the wrong
+// person.
+async function emailsForNames(names: string[]): Promise<string[]> {
+  const clean = names.map((n) => (n ?? "").trim()).filter(Boolean);
+  if (clean.length === 0) return [];
+  const supabase = createClient();
+  const { data } = await supabase.from("profiles").select("full_name, email");
+  const profiles = (data ?? []) as { full_name: string | null; email: string }[];
+  const norm = (s: string) =>
+    s.toLowerCase().replace(/[^a-z\s]/g, " ").replace(/\s+/g, " ").trim();
+  const out = new Set<string>();
+  for (const name of clean) {
+    const target = norm(name);
+    const tt = target.split(" ").filter(Boolean);
+    let best: { email: string; score: number } | null = null;
+    for (const p of profiles) {
+      const cand = norm(p.full_name ?? p.email.split("@")[0]);
+      if (!cand) continue;
+      const ct = new Set(cand.split(" ").filter(Boolean));
+      let overlap = 0;
+      for (const x of tt) if (ct.has(x)) overlap++;
+      let score = overlap / Math.max(tt.length, 1);
+      if (cand === target) score = 1;
+      if (!best || score > best.score) best = { email: p.email, score };
+    }
+    if (best && best.score >= 0.5) out.add(best.email);
+  }
+  return Array.from(out);
+}
+
 async function syncStakeholders(taskId: string, ids: string[]) {
   const supabase = createClient();
   await supabase.from("task_stakeholders").delete().eq("task_id", taskId);
@@ -92,6 +133,23 @@ export async function createTask(formData: FormData) {
 
   await syncStakeholders(task.id, stakeholderIds);
 
+  // Task 1: block the stakeholders' calendars from today until the ETA.
+  const eta = str(formData.get("eta"));
+  if (eta) {
+    const emails = await emailsForProfiles(stakeholderIds);
+    const eventId = await syncTaskCalendarEvent({
+      taskId: task.id,
+      creatorId: me.id,
+      title: task.title,
+      eta,
+      existingEventId: null,
+      stakeholderEmails: emails,
+    });
+    if (eventId) {
+      await supabase.from("tasks").update({ calendar_event_id: eventId }).eq("id", task.id);
+    }
+  }
+
   // Look up assignee name for the Slack message (if assigned to someone)
   const assigneeId = str(formData.get("assignee_id"));
   let assigneeName: string | null = null;
@@ -125,7 +183,7 @@ export async function updateTask(taskId: string, formData: FormData) {
 
   const { data: before } = await supabase
     .from("tasks")
-    .select("status, title")
+    .select("status, title, created_by, calendar_event_id")
     .eq("id", taskId)
     .single();
 
@@ -156,6 +214,29 @@ export async function updateTask(taskId: string, formData: FormData) {
 
   await syncStakeholders(taskId, stakeholderIds);
 
+  // Task 1: keep the calendar block in sync with the ETA / completion.
+  const newEta = str(formData.get("eta"));
+  const newTitle = str(formData.get("title")) ?? before?.title ?? "Untitled task";
+  if (newStatus === "Completed") {
+    if (before?.calendar_event_id) {
+      await deleteTaskCalendarEvent(before.created_by ?? null, before.calendar_event_id);
+      await supabase.from("tasks").update({ calendar_event_id: null }).eq("id", taskId);
+    }
+  } else {
+    const emails = await emailsForProfiles(stakeholderIds);
+    const eventId = await syncTaskCalendarEvent({
+      taskId,
+      creatorId: before?.created_by ?? me.id,
+      title: newTitle,
+      eta: newEta,
+      existingEventId: before?.calendar_event_id ?? null,
+      stakeholderEmails: emails,
+    });
+    if ((eventId ?? null) !== (before?.calendar_event_id ?? null)) {
+      await supabase.from("tasks").update({ calendar_event_id: eventId }).eq("id", taskId);
+    }
+  }
+
   if (before && before.status !== newStatus) {
     await notifyStatusChange({
       taskTitle: str(formData.get("title")) ?? before.title,
@@ -179,7 +260,7 @@ export async function changeStatus(taskId: string, newStatus: Status) {
 
   const { data: before } = await supabase
     .from("tasks")
-    .select("status, title, assignee_id")
+    .select("status, title, assignee_id, created_by, calendar_event_id")
     .eq("id", taskId)
     .single();
 
@@ -191,6 +272,12 @@ export async function changeStatus(taskId: string, newStatus: Status) {
 
   const { error } = await supabase.from("tasks").update(update).eq("id", taskId);
   if (error) throw new Error(error.message);
+
+  // Completing a task (via the board) releases its calendar block too.
+  if (newStatus === "Completed" && before.calendar_event_id) {
+    await deleteTaskCalendarEvent(before.created_by ?? null, before.calendar_event_id);
+    await supabase.from("tasks").update({ calendar_event_id: null }).eq("id", taskId);
+  }
 
   if (before.status !== newStatus) {
     await notifyStatusChange({
@@ -210,11 +297,191 @@ export async function changeStatus(taskId: string, newStatus: Status) {
 
 export async function deleteTask(taskId: string) {
   const supabase = createClient();
+  const { data: before } = await supabase
+    .from("tasks")
+    .select("created_by, calendar_event_id")
+    .eq("id", taskId)
+    .single();
+
   const { error } = await supabase.from("tasks").delete().eq("id", taskId);
   if (error) throw new Error(error.message);
+
+  // Task 1: remove any calendar block for this task.
+  if (before?.calendar_event_id) {
+    await deleteTaskCalendarEvent(before.created_by ?? null, before.calendar_event_id);
+  }
+
   revalidatePath("/board");
   revalidatePath("/tasks");
   revalidatePath("/people");
+}
+
+// Create a manual adhoc request from the "+ Adhoc" form. Slack-sourced adhoc
+// requests are written separately by the /api/slack/events endpoint.
+export async function createAdhocRequest(formData: FormData) {
+  const supabase = createClient();
+  const me = await currentProfile();
+
+  const eta = str(formData.get("eta"));
+  const moduleOwner = str(formData.get("module_owner"));
+  const stakeholder = str(formData.get("stakeholder"));
+
+  const { data: created, error } = await supabase
+    .from("adhoc_requests")
+    .insert({
+      source: "manual",
+      status: (str(formData.get("status")) ?? "To pick") as Status,
+      eta,
+      permalink: str(formData.get("slack_link")),
+      title: str(formData.get("title")),
+      raised_by: str(formData.get("raised_by")) ?? me.name,
+      program: str(formData.get("program")),
+      batch: str(formData.get("batch")),
+      module: str(formData.get("module")),
+      beneficiary: str(formData.get("beneficiary")),
+      problem: str(formData.get("problem")),
+      learners_impact: str(formData.get("learners_impact")),
+      risk_if_not_done: str(formData.get("risk_if_not_done")),
+      outcome: str(formData.get("outcome")),
+      module_owner: moduleOwner,
+      stakeholder,
+      created_by: me.id,
+    })
+    .select("id, title")
+    .single();
+
+  if (error || !created) throw new Error(error?.message ?? "Could not add request");
+
+  // Calendar block for the creator (today -> ETA), inviting any named people we
+  // can confidently match to team accounts.
+  if (eta) {
+    const emails = await emailsForNames([moduleOwner, stakeholder].filter(Boolean) as string[]);
+    const eventId = await syncTaskCalendarEvent({
+      taskId: created.id,
+      creatorId: me.id,
+      title: created.title ?? "Adhoc request",
+      eta,
+      existingEventId: null,
+      stakeholderEmails: emails,
+    });
+    if (eventId) {
+      await supabase.from("adhoc_requests").update({ calendar_event_id: eventId }).eq("id", created.id);
+    }
+  }
+
+  revalidatePath("/adhoc");
+  revalidatePath("/board");
+}
+
+// Edit an adhoc request (e.g. add the ETA/status to a Slack-fetched one).
+export async function updateAdhocRequest(id: string, formData: FormData) {
+  const supabase = createClient();
+  await currentProfile();
+
+  const { data: before } = await supabase
+    .from("adhoc_requests")
+    .select("created_by, calendar_event_id")
+    .eq("id", id)
+    .single();
+
+  const status = (str(formData.get("status")) ?? "To pick") as Status;
+  const eta = str(formData.get("eta"));
+  const title = str(formData.get("title"));
+  const moduleOwner = str(formData.get("module_owner"));
+  const stakeholder = str(formData.get("stakeholder"));
+
+  const { error } = await supabase
+    .from("adhoc_requests")
+    .update({
+      status,
+      eta,
+      title,
+      permalink: str(formData.get("slack_link")),
+      program: str(formData.get("program")),
+      batch: str(formData.get("batch")),
+      module: str(formData.get("module")),
+      beneficiary: str(formData.get("beneficiary")),
+      problem: str(formData.get("problem")),
+      learners_impact: str(formData.get("learners_impact")),
+      risk_if_not_done: str(formData.get("risk_if_not_done")),
+      outcome: str(formData.get("outcome")),
+      module_owner: moduleOwner,
+      stakeholder,
+    })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+
+  // Keep the calendar block in sync (only possible if the row has a creator with
+  // a connected calendar — Slack-fetched rows have no creator, so this no-ops).
+  if (status === "Completed") {
+    if (before?.calendar_event_id) {
+      await deleteTaskCalendarEvent(before.created_by ?? null, before.calendar_event_id);
+      await supabase.from("adhoc_requests").update({ calendar_event_id: null }).eq("id", id);
+    }
+  } else {
+    const emails = await emailsForNames([moduleOwner, stakeholder].filter(Boolean) as string[]);
+    const eventId = await syncTaskCalendarEvent({
+      taskId: id,
+      creatorId: before?.created_by ?? null,
+      title: title ?? "Adhoc request",
+      eta,
+      existingEventId: before?.calendar_event_id ?? null,
+      stakeholderEmails: emails,
+    });
+    if ((eventId ?? null) !== (before?.calendar_event_id ?? null)) {
+      await supabase.from("adhoc_requests").update({ calendar_event_id: eventId }).eq("id", id);
+    }
+  }
+
+  revalidatePath("/adhoc");
+  revalidatePath("/board");
+}
+
+// Move an adhoc request across stages from the Board.
+export async function changeAdhocStatus(id: string, newStatus: Status) {
+  const supabase = createClient();
+  await currentProfile(); // ensure signed in
+
+  const { data: before } = await supabase
+    .from("adhoc_requests")
+    .select("created_by, calendar_event_id")
+    .eq("id", id)
+    .single();
+
+  const { error } = await supabase
+    .from("adhoc_requests")
+    .update({ status: newStatus })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+
+  // Completing it releases the calendar block.
+  if (newStatus === "Completed" && before?.calendar_event_id) {
+    await deleteTaskCalendarEvent(before.created_by ?? null, before.calendar_event_id);
+    await supabase.from("adhoc_requests").update({ calendar_event_id: null }).eq("id", id);
+  }
+
+  revalidatePath("/board");
+  revalidatePath("/adhoc");
+}
+
+// Delete an adhoc request (and release any calendar block it created).
+export async function deleteAdhocRequest(id: string) {
+  const supabase = createClient();
+  await currentProfile();
+  const { data: before } = await supabase
+    .from("adhoc_requests")
+    .select("created_by, calendar_event_id")
+    .eq("id", id)
+    .single();
+
+  const { error } = await supabase.from("adhoc_requests").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+
+  if (before?.calendar_event_id) {
+    await deleteTaskCalendarEvent(before.created_by ?? null, before.calendar_event_id);
+  }
+  revalidatePath("/adhoc");
+  revalidatePath("/board");
 }
 
 // ----------------------------------------------------------------

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import { CalendarCheck2, CalendarPlus } from "lucide-react";
 import { ThemeToggle } from "./theme-toggle";
 import type { Profile } from "@/lib/types";
 
@@ -11,9 +12,16 @@ const BASE_LINKS = [
   { href: "/tasks", label: "Tasks" },
   { href: "/people", label: "People" },
   { href: "/krs", label: "KRs" },
+  { href: "/adhoc", label: "Adhoc" },
 ];
 
-export function Nav({ profile }: { profile: Profile }) {
+export function Nav({
+  profile,
+  calendarConnected = false,
+}: {
+  profile: Profile;
+  calendarConnected?: boolean;
+}) {
   const pathname = usePathname();
   const [logoOk, setLogoOk] = useState(true);
   const links =
@@ -28,9 +36,9 @@ export function Nav({ profile }: { profile: Profile }) {
           {logoOk ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src="/scaler-logo.png"
+              src="/scaler-logo.svg"
               alt="Scaler"
-              className="h-7 w-auto"
+              className="h-6 w-auto dark:brightness-0 dark:invert"
               onError={() => setLogoOk(false)}
             />
           ) : (
@@ -64,6 +72,22 @@ export function Nav({ profile }: { profile: Profile }) {
         </nav>
 
         <div className="ml-auto flex items-center gap-3">
+          {calendarConnected ? (
+            <span
+              className="hidden items-center gap-1.5 rounded-md border border-emerald-500/40 px-2.5 py-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400 sm:inline-flex"
+              title="Your Google Calendar is connected — new tasks with an ETA will block your stakeholders' calendars."
+            >
+              <CalendarCheck2 size={14} /> Calendar connected
+            </span>
+          ) : (
+            <a
+              href="/api/google/connect"
+              className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-muted transition-colors hover:text-fg hover:bg-surface-2"
+              title="Connect your Google Calendar so tasks you create with an ETA block your stakeholders' calendars."
+            >
+              <CalendarPlus size={14} /> Connect Calendar
+            </a>
+          )}
           <ThemeToggle />
           <div className="flex items-center gap-2">
             {profile.avatar_url ? (
