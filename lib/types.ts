@@ -51,12 +51,16 @@ export type KR = {
 
 export const KR_STATUSES = ["On track", "At risk", "Behind", "Achieved"] as const;
 
-// Adhoc request pulled from #instructor-adhoc-request-1 (Task 3, read-only).
+// Adhoc request — either fetched from #instructor-adhoc-request-1 (source
+// "slack") or added manually in-app via "+ Adhoc" (source "manual").
 export type AdhocRequest = {
   id: string;
-  slack_ts: string;
+  source: "slack" | "manual";
+  slack_ts: string | null;
   permalink: string | null;
+  title: string | null;
   posted_at: string | null;
+  created_at: string;
   raised_by: string | null;
   program: string | null;
   batch: string | null;

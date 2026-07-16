@@ -1,5 +1,6 @@
 import { getAdhocRequests } from "@/lib/queries";
 import { AdhocList } from "../../components/adhoc-list";
+import { AdhocForm } from "../../components/adhoc-form";
 
 export const dynamic = "force-dynamic";
 
@@ -8,12 +9,15 @@ export default async function AdhocPage() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-xl font-bold tracking-tight">Adhoc Requests</h1>
-        <p className="text-sm text-muted">
-          Requests raised via the <span className="font-medium">Instructor-flow</span> workflow in{" "}
-          <span className="font-medium">#instructor-adhoc-request-1</span>. Read-only.
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight">Adhoc Requests</h1>
+          <p className="text-sm text-muted">
+            {requests.length} request{requests.length === 1 ? "" : "s"} · added here or fetched from{" "}
+            <span className="font-medium">#instructor-adhoc-request-1</span>.
+          </p>
+        </div>
+        <AdhocForm variant="solid" />
       </div>
       <AdhocList requests={requests} />
     </div>

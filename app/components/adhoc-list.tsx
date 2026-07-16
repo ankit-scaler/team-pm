@@ -1,79 +1,166 @@
-import { ExternalLink } from "lucide-react";
-import type { AdhocRequest } from "@/lib/types";
+"use client";
 
-function Field({ label, value }: { label: string; value: string | null }) {
-  if (!value) return null;
+import { useMemo, useState } from "react";
+import { MessageSquare, Slack } from "lucide-react";
+import { PROGRAMS, type AdhocRequest } from "@/lib/types";
+
+const selCls = "rounded-lg border border-border bg-surface px-2.5 py-1.5 text-sm outline-none";
+
+function fmt(iso: string | null) {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function displayTitle(r: AdhocRequest) {
+  return r.title || r.module || r.program || "Adhoc request";
+}
+
+export function AdhocList({ requests }: { requests: AdhocRequest[] }) {
+  const [q, setQ] = useState("");
+  const [program, setProgram] = useState("");
+  const [source, setSource] = useState("");
+
+  const filtered = useMemo(() => {
+    return requests.filter((r) => {
+      if (program && r.program !== program) return false;
+      if (source && r.source !== source) return false;
+      if (q) {
+        const hay = [r.title, r.module, r.problem, r.raised_by, r.batch, r.module_owner, r.stakeholder]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        if (!hay.includes(q.toLowerCase())) return false;
+      }
+      return true;
+    });
+  }, [requests, q, program, source]);
+
+  const anyFilter = q || program || source;
+
   return (
-    <div>
-      <div className="text-[11px] font-semibold uppercase tracking-wide text-muted">{label}</div>
-      <div className="whitespace-pre-line text-sm text-fg">{value}</div>
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search requests…"
+          className="min-w-[160px] flex-1 rounded-lg border border-border bg-surface px-3 py-1.5 text-sm outline-none focus:border-accent"
+        />
+        <select value={program} onChange={(e) => setProgram(e.target.value)} className={selCls}>
+          <option value="">All programs</option>
+          {PROGRAMS.map((p) => (
+            <option key={p} value={p}>{p}</option>
+          ))}
+        </select>
+        <select value={source} onChange={(e) => setSource(e.target.value)} className={selCls}>
+          <option value="">All sources</option>
+          <option value="slack">From Slack</option>
+          <option value="manual">Added manually</option>
+        </select>
+        {anyFilter && (
+          <button
+            type="button"
+            onClick={() => {
+              setQ(""); setProgram(""); setSource("");
+            }}
+            className="text-xs text-accent hover:underline"
+          >
+            Clear filters
+          </button>
+        )}
+        <span className="ml-auto text-xs text-muted">
+          {filtered.length} of {requests.length}
+        </span>
+      </div>
+
+      <div className="overflow-x-auto rounded-xl border border-border bg-surface">
+        <table className="w-full text-left text-sm">
+          <thead className="border-b border-border bg-surface-2/40 text-xs uppercase tracking-wider text-muted">
+            <tr>
+              <th className="px-4 py-3 font-semibold">Request</th>
+              <th className="px-4 py-3 font-semibold">Benefits</th>
+              <th className="px-4 py-3 font-semibold">Learners</th>
+              <th className="px-4 py-3 font-semibold">Module owner</th>
+              <th className="px-4 py-3 font-semibold">Stakeholder</th>
+              <th className="px-4 py-3 font-semibold">Raised by</th>
+              <th className="px-4 py-3 font-semibold">Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.length === 0 && (
+              <tr>
+                <td colSpan={7} className="px-4 py-10 text-center text-muted">
+                  {requests.length === 0
+                    ? "No adhoc requests yet. Add one with “+ Adhoc”, or they’ll appear here from #instructor-adhoc-request-1."
+                    : "No requests match these filters."}
+                </td>
+              </tr>
+            )}
+            {filtered.map((r) => (
+              <tr key={r.id} className="border-b border-border last:border-0 align-top transition-colors hover:bg-surface-2/40">
+                <td className="max-w-md px-4 py-3">
+                  <div className="text-[13px] font-semibold text-fg">{displayTitle(r)}</div>
+                  <div className="mt-1.5 flex flex-wrap gap-1">
+                    <SourceBadge source={r.source} />
+                    {r.program && <Chip label={r.program} tone="program" />}
+                    {r.batch && <Chip label={r.batch} tone="track" />}
+                  </div>
+                  {r.module && r.module !== displayTitle(r) && (
+                    <div className="mt-1 text-xs text-muted">{r.module}</div>
+                  )}
+                  {r.problem && (
+                    <div className="mt-1 line-clamp-2 whitespace-pre-line text-xs text-muted">{r.problem}</div>
+                  )}
+                  {r.permalink && (
+                    <div className="mt-1.5">
+                      <a
+                        href={r.permalink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-[11px] font-medium text-accent hover:underline"
+                      >
+                        <MessageSquare size={11} /> Open in Slack
+                      </a>
+                    </div>
+                  )}
+                </td>
+                <td className="px-4 py-3 text-muted">{r.beneficiary ?? "—"}</td>
+                <td className="px-4 py-3 text-muted">{r.learners_impact ?? "—"}</td>
+                <td className="px-4 py-3">{r.module_owner ?? <span className="text-muted">—</span>}</td>
+                <td className="px-4 py-3">{r.stakeholder ?? <span className="text-muted">—</span>}</td>
+                <td className="px-4 py-3 text-muted">{r.raised_by ?? "—"}</td>
+                <td className="px-4 py-3 text-muted">{fmt(r.posted_at ?? r.created_at)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
 
-function fmtDate(iso: string | null): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  return d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+function SourceBadge({ source }: { source: "slack" | "manual" }) {
+  return source === "slack" ? (
+    <span className="inline-flex items-center gap-1 rounded-md border border-accent/30 bg-accent/10 px-1.5 py-0.5 text-[11px] font-medium text-accent">
+      <Slack size={10} /> Slack
+    </span>
+  ) : (
+    <span className="inline-flex items-center rounded-md border border-border bg-surface-2 px-1.5 py-0.5 text-[11px] font-medium text-fg/80">
+      Manual
+    </span>
+  );
 }
 
-export function AdhocList({ requests }: { requests: AdhocRequest[] }) {
-  if (requests.length === 0) {
-    return (
-      <div className="rounded-xl border border-dashed border-border bg-surface p-10 text-center">
-        <p className="text-sm font-medium text-fg">No adhoc requests yet</p>
-        <p className="mt-1 text-sm text-muted">
-          New requests posted in #instructor-adhoc-request-1 will appear here automatically.
-        </p>
-      </div>
-    );
-  }
+const DOT: Record<"program" | "track", string> = {
+  program: "bg-pink-500",
+  track: "bg-teal-500",
+};
 
+function Chip({ label, tone }: { label: string; tone: "program" | "track" }) {
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      {requests.map((r) => (
-        <div key={r.id} className="rounded-xl border border-border bg-surface p-5 shadow-sm">
-          <div className="mb-3 flex items-start justify-between gap-3">
-            <div>
-              <div className="text-sm font-semibold text-fg">
-                {r.program ?? "Adhoc request"}
-                {r.batch ? <span className="font-normal text-muted"> · {r.batch}</span> : null}
-              </div>
-              {r.raised_by && (
-                <div className="text-xs text-muted">
-                  Raised by <span className="font-medium text-fg">{r.raised_by}</span>
-                  {r.posted_at ? ` · ${fmtDate(r.posted_at)}` : ""}
-                </div>
-              )}
-            </div>
-            {r.permalink && (
-              <a
-                href={r.permalink}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex shrink-0 items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-muted transition-colors hover:text-fg"
-              >
-                <ExternalLink size={12} /> Slack
-              </a>
-            )}
-          </div>
-
-          <div className="space-y-3">
-            <Field label="Module" value={r.module} />
-            <Field label="Problem / scope" value={r.problem} />
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Who benefits" value={r.beneficiary} />
-              <Field label="Learners impacted" value={r.learners_impact} />
-            </div>
-            <Field label="Risk if not done" value={r.risk_if_not_done} />
-            <Field label="Outcome to track" value={r.outcome} />
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Module owner" value={r.module_owner} />
-              <Field label="Stakeholder" value={r.stakeholder} />
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
+    <span className="inline-flex items-center gap-1 rounded-md border border-border bg-surface-2 px-1.5 py-0.5 text-[11px] font-medium text-fg/80">
+      <span className={`h-1.5 w-1.5 rounded-full ${DOT[tone]}`} />
+      {label}
+    </span>
   );
 }

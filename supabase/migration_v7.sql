@@ -24,14 +24,18 @@ create table if not exists public.google_credentials (
 alter table public.google_credentials enable row level security;
 
 -- ---------- Task 3: adhoc requests from Slack ----------
--- One row per "Adhoc Request Message" posted by the Instructor-flow workflow
--- into #instructor-adhoc-request-1. Written by the Slack events endpoint using
--- the service-role client; read-only to signed-in team members.
+-- One row per adhoc request. Two sources:
+--   'slack'  — posted by the Instructor-flow workflow into #instructor-adhoc-request-1,
+--              written by the Slack events endpoint (service-role client).
+--   'manual' — added by a team member via the "+ Adhoc" button in the app.
+-- Readable by any signed-in team member; insertable by any signed-in member (manual).
 create table if not exists public.adhoc_requests (
   id                uuid primary key default gen_random_uuid(),
-  slack_ts          text unique not null,       -- message ts; dedup key
+  source            text not null default 'slack' check (source in ('slack', 'manual')),
+  slack_ts          text unique,                 -- message ts; dedup key (null for manual)
   slack_channel     text,
   permalink         text,
+  title             text,                        -- short label (manual entries / display)
   raised_by         text,
   program           text,
   batch             text,
@@ -44,14 +48,17 @@ create table if not exists public.adhoc_requests (
   module_owner      text,
   stakeholder       text,
   raw               jsonb,                       -- full parsed field map (safety net)
+  created_by        uuid references public.profiles (id) on delete set null,
   posted_at         timestamptz,                 -- when it was posted in Slack
   created_at        timestamptz not null default now()
 );
 
-create index if not exists adhoc_requests_posted_idx
-  on public.adhoc_requests (posted_at desc);
+create index if not exists adhoc_requests_created_idx
+  on public.adhoc_requests (created_at desc);
 
 alter table public.adhoc_requests enable row level security;
 
 create policy "adhoc readable by authenticated"
   on public.adhoc_requests for select to authenticated using (true);
+create policy "adhoc insertable by authenticated"
+  on public.adhoc_requests for insert to authenticated with check (true);

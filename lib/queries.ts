@@ -48,9 +48,9 @@ export async function getAdhocRequests(): Promise<AdhocRequest[]> {
   const { data, error } = await supabase
     .from("adhoc_requests")
     .select(
-      "id, slack_ts, permalink, posted_at, raised_by, program, batch, module, beneficiary, problem, learners_impact, risk_if_not_done, outcome, module_owner, stakeholder"
+      "id, source, slack_ts, permalink, title, posted_at, created_at, raised_by, program, batch, module, beneficiary, problem, learners_impact, risk_if_not_done, outcome, module_owner, stakeholder"
     )
-    .order("posted_at", { ascending: false, nullsFirst: false });
+    .order("created_at", { ascending: false });
 
   if (error) {
     console.error("getAdhocRequests:", error.message);

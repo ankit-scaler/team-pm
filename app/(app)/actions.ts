@@ -278,6 +278,33 @@ export async function deleteTask(taskId: string) {
   revalidatePath("/people");
 }
 
+// Create a manual adhoc request from the "+ Adhoc" form. Slack-sourced adhoc
+// requests are written separately by the /api/slack/events endpoint.
+export async function createAdhocRequest(formData: FormData) {
+  const supabase = createClient();
+  const me = await currentProfile();
+
+  const { error } = await supabase.from("adhoc_requests").insert({
+    source: "manual",
+    title: str(formData.get("title")),
+    raised_by: str(formData.get("raised_by")) ?? me.name,
+    program: str(formData.get("program")),
+    batch: str(formData.get("batch")),
+    module: str(formData.get("module")),
+    beneficiary: str(formData.get("beneficiary")),
+    problem: str(formData.get("problem")),
+    learners_impact: str(formData.get("learners_impact")),
+    risk_if_not_done: str(formData.get("risk_if_not_done")),
+    outcome: str(formData.get("outcome")),
+    module_owner: str(formData.get("module_owner")),
+    stakeholder: str(formData.get("stakeholder")),
+    created_by: me.id,
+  });
+
+  if (error) throw new Error(error.message);
+  revalidatePath("/adhoc");
+}
+
 // ----------------------------------------------------------------
 //  Admin actions — user management. Guarded server-side: the caller
 //  must be an admin, regardless of what the UI shows.
