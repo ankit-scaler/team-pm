@@ -14,10 +14,12 @@ export function AdhocForm({
   variant = "solid",
   request,
   triggerClassName,
+  allowedPrograms = PROGRAMS as unknown as string[],
 }: {
   variant?: "solid" | "outline";
   request?: AdhocRequest;
   triggerClassName?: string;
+  allowedPrograms?: string[];
 }) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -134,7 +136,7 @@ export function AdhocForm({
                   <label className={labelCls}>Program</label>
                   <select name="program" defaultValue={request?.program ?? ""} className={fieldCls}>
                     <option value="">—</option>
-                    {PROGRAMS.map((p) => (
+                    {allowedPrograms.map((p) => (
                       <option key={p} value={p}>{p}</option>
                     ))}
                   </select>

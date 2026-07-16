@@ -1,5 +1,17 @@
 import { createClient } from "@/lib/supabase/server";
+import { getMyAccess } from "@/lib/access";
 import { DEFAULT_METRICS, type AdhocRequest, type Profile, type Task } from "@/lib/types";
+
+export type MembershipRow = { profile_id: string; program: string; role: "mo" | "user" };
+
+// All program memberships (for the management UI). Readable by any signed-in user.
+export async function getAllMemberships(): Promise<MembershipRow[]> {
+  const supabase = createClient();
+  const { data } = await supabase
+    .from("program_memberships")
+    .select("profile_id, program, role");
+  return (data as MembershipRow[]) ?? [];
+}
 
 const PROFILE_COLS = "id, email, full_name, avatar_url, role";
 
@@ -14,7 +26,9 @@ export async function getPeople(): Promise<Profile[]> {
 
 export async function getTasks(): Promise<Task[]> {
   const supabase = createClient();
-  const { data, error } = await supabase
+  const access = await getMyAccess();
+
+  let query = supabase
     .from("tasks")
     .select(
       `*,
@@ -23,6 +37,11 @@ export async function getTasks(): Promise<Task[]> {
        task_stakeholders ( profile:profiles!task_stakeholders_profile_id_fkey (${PROFILE_COLS}) )`
     )
     .order("created_at", { ascending: false });
+
+  // Program scoping: non-admins only see their programs (null-program = admin-only).
+  if (!access.isAdmin) query = query.in("program", access.visiblePrograms);
+
+  const { data, error } = await query;
 
   if (error) {
     console.error("getTasks:", error.message);
@@ -45,12 +64,19 @@ export async function getTasks(): Promise<Task[]> {
 
 export async function getAdhocRequests(): Promise<AdhocRequest[]> {
   const supabase = createClient();
-  const { data, error } = await supabase
+  const access = await getMyAccess();
+
+  let query = supabase
     .from("adhoc_requests")
     .select(
       "id, source, status, eta, delivered_date, slack_ts, permalink, title, posted_at, created_at, raised_by, program, batch, module, beneficiary, problem, learners_impact, risk_if_not_done, outcome, module_owner, stakeholder"
     )
     .order("created_at", { ascending: false });
+
+  // Program scoping (admins see all; null-program adhoc = admin-only).
+  if (!access.isAdmin) query = query.in("program", access.visiblePrograms);
+
+  const { data, error } = await query;
 
   if (error) {
     console.error("getAdhocRequests:", error.message);

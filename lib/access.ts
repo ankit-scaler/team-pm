@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 
 // -----------------------------------------------------------------------------
@@ -30,7 +31,9 @@ export type Access = {
   isPending: boolean;
 };
 
-export async function getMyAccess(): Promise<Access> {
+// Wrapped in React cache so repeated calls within one render (layout + pages +
+// queries all ask for it) hit the DB just once.
+export const getMyAccess = cache(async function getMyAccess(): Promise<Access> {
   const supabase = createClient();
   const {
     data: { user },
@@ -71,7 +74,7 @@ export async function getMyAccess(): Promise<Access> {
     moPrograms,
     isPending: !isAdmin && memberships.length === 0,
   };
-}
+});
 
 // Can this access see items belonging to `program`? (null program ⇒ admin-only)
 export function canSeeProgram(access: Access, program: string | null): boolean {

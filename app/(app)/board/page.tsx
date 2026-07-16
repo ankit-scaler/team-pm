@@ -1,4 +1,6 @@
 import { getPeople, getTasks, getAdhocRequests, distinctTags, distinctMetrics } from "@/lib/queries";
+import { getMyAccess } from "@/lib/access";
+import { PROGRAMS } from "@/lib/types";
 import { KanbanBoard } from "../../components/kanban-board";
 import { TaskForm } from "../../components/task-form";
 import { AdhocForm } from "../../components/adhoc-form";
@@ -6,13 +8,15 @@ import { AdhocForm } from "../../components/adhoc-form";
 export const dynamic = "force-dynamic";
 
 export default async function BoardPage() {
-  const [tasks, people, adhocRequests] = await Promise.all([
+  const [tasks, people, adhocRequests, access] = await Promise.all([
     getTasks(),
     getPeople(),
     getAdhocRequests(),
+    getMyAccess(),
   ]);
   const allTags = distinctTags(tasks);
   const allMetrics = distinctMetrics(tasks);
+  const allowedPrograms = access.isAdmin ? [...PROGRAMS] : access.visiblePrograms;
 
   return (
     <div className="space-y-5">
@@ -22,8 +26,8 @@ export default async function BoardPage() {
           <p className="text-sm text-muted">Move work across stages. New tasks and status changes notify Slack.</p>
         </div>
         <div className="flex items-center gap-2">
-          <AdhocForm variant="outline" />
-          <TaskForm people={people} allTags={allTags} allMetrics={allMetrics} />
+          <AdhocForm variant="outline" allowedPrograms={allowedPrograms} />
+          <TaskForm people={people} allTags={allTags} allMetrics={allMetrics} allowedPrograms={allowedPrograms} />
         </div>
       </div>
       <KanbanBoard

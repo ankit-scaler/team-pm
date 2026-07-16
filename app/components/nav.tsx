@@ -18,16 +18,21 @@ const BASE_LINKS = [
 export function Nav({
   profile,
   calendarConnected = false,
+  isAdmin = false,
+  isManager = false,
 }: {
   profile: Profile;
   calendarConnected?: boolean;
+  isAdmin?: boolean;
+  isManager?: boolean;
 }) {
   const pathname = usePathname();
   const [logoOk, setLogoOk] = useState(true);
-  const links =
-    profile.role === "admin"
-      ? [...BASE_LINKS, { href: "/admin", label: "Admin" }]
-      : BASE_LINKS;
+  const links = [
+    ...BASE_LINKS,
+    ...(isManager ? [{ href: "/admin", label: "Team" }] : []),
+    ...(isAdmin ? [{ href: "/insights", label: "Insights" }] : []),
+  ];
 
   return (
     <header className="sticky top-0 z-20 border-b border-border bg-bg/80 backdrop-blur">

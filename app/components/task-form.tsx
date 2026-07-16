@@ -17,11 +17,13 @@ export function TaskForm({
   task,
   allTags = [],
   allMetrics = [],
+  allowedPrograms = PROGRAMS as unknown as string[],
 }: {
   people: Profile[];
   task?: Task;
   allTags?: string[];
   allMetrics?: string[];
+  allowedPrograms?: string[];
 }) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -174,7 +176,7 @@ export function TaskForm({
                   <label className={labelCls}>Program</label>
                   <select name="program" defaultValue={task?.program ?? ""} className={fieldCls}>
                     <option value="">—</option>
-                    {PROGRAMS.map((p) => (
+                    {allowedPrograms.map((p) => (
                       <option key={p} value={p}>{p}</option>
                     ))}
                   </select>

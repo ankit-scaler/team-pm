@@ -1,4 +1,6 @@
 import { getPeople, getTasks, distinctTags, distinctMetrics } from "@/lib/queries";
+import { getMyAccess } from "@/lib/access";
+import { PROGRAMS } from "@/lib/types";
 import { TaskTable } from "../../components/task-table";
 import { TaskForm } from "../../components/task-form";
 import { AdhocForm } from "../../components/adhoc-form";
@@ -6,9 +8,10 @@ import { AdhocForm } from "../../components/adhoc-form";
 export const dynamic = "force-dynamic";
 
 export default async function TasksPage() {
-  const [tasks, people] = await Promise.all([getTasks(), getPeople()]);
+  const [tasks, people, access] = await Promise.all([getTasks(), getPeople(), getMyAccess()]);
   const allTags = distinctTags(tasks);
   const allMetrics = distinctMetrics(tasks);
+  const allowedPrograms = access.isAdmin ? [...PROGRAMS] : access.visiblePrograms;
 
   return (
     <div className="space-y-5">
@@ -18,8 +21,8 @@ export default async function TasksPage() {
           <p className="text-sm text-muted">{tasks.length} tasks · filter by stage, person, tag, or ETA.</p>
         </div>
         <div className="flex items-center gap-2">
-          <AdhocForm variant="outline" />
-          <TaskForm people={people} allTags={allTags} allMetrics={allMetrics} />
+          <AdhocForm variant="outline" allowedPrograms={allowedPrograms} />
+          <TaskForm people={people} allTags={allTags} allMetrics={allMetrics} allowedPrograms={allowedPrograms} />
         </div>
       </div>
       <TaskTable tasks={tasks} people={people} allTags={allTags} allMetrics={allMetrics} />
