@@ -101,6 +101,15 @@ async function emailsForNames(names: string[]): Promise<string[]> {
   return Array.from(out);
 }
 
+// Display name for a profile id (used to keep adhoc.module_owner text in sync
+// with the chosen assignee).
+async function nameForProfile(id: string | null): Promise<string | null> {
+  if (!id) return null;
+  const supabase = createClient();
+  const { data } = await supabase.from("profiles").select("full_name, email").eq("id", id).single();
+  return data?.full_name ?? data?.email ?? null;
+}
+
 async function syncStakeholders(taskId: string, ids: string[]) {
   const supabase = createClient();
   await supabase.from("task_stakeholders").delete().eq("task_id", taskId);
@@ -345,7 +354,8 @@ export async function createAdhocRequest(formData: FormData) {
   await assertProgramAllowed(str(formData.get("program")));
 
   const eta = str(formData.get("eta"));
-  const moduleOwner = str(formData.get("module_owner"));
+  const assigneeId = str(formData.get("assignee_id"));
+  const moduleOwner = await nameForProfile(assigneeId); // keep text in sync with assignee
   const stakeholder = str(formData.get("stakeholder"));
 
   const { data: created, error } = await supabase
@@ -354,6 +364,7 @@ export async function createAdhocRequest(formData: FormData) {
       source: "manual",
       status: (str(formData.get("status")) ?? "To pick") as Status,
       eta,
+      assignee_id: assigneeId,
       permalink: str(formData.get("slack_link")),
       title: str(formData.get("title")),
       raised_by: str(formData.get("raised_by")) ?? me.name,
@@ -413,7 +424,8 @@ export async function updateAdhocRequest(id: string, formData: FormData) {
   const status = (str(formData.get("status")) ?? "To pick") as Status;
   const eta = str(formData.get("eta"));
   const title = str(formData.get("title"));
-  const moduleOwner = str(formData.get("module_owner"));
+  const assigneeId = str(formData.get("assignee_id"));
+  const moduleOwner = await nameForProfile(assigneeId);
   const stakeholder = str(formData.get("stakeholder"));
 
   const { error } = await supabase
@@ -422,6 +434,7 @@ export async function updateAdhocRequest(id: string, formData: FormData) {
       status,
       eta,
       title,
+      assignee_id: assigneeId,
       permalink: str(formData.get("slack_link")),
       program: str(formData.get("program")),
       batch: str(formData.get("batch")),

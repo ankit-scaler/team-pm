@@ -1,4 +1,4 @@
-import { getAdhocRequests } from "@/lib/queries";
+import { getAdhocRequests, getPeople } from "@/lib/queries";
 import { getMyAccess } from "@/lib/access";
 import { PROGRAMS } from "@/lib/types";
 import { AdhocList } from "../../components/adhoc-list";
@@ -7,7 +7,11 @@ import { AdhocForm } from "../../components/adhoc-form";
 export const dynamic = "force-dynamic";
 
 export default async function AdhocPage() {
-  const [requests, access] = await Promise.all([getAdhocRequests(), getMyAccess()]);
+  const [requests, people, access] = await Promise.all([
+    getAdhocRequests(),
+    getPeople(),
+    getMyAccess(),
+  ]);
   const allowedPrograms = access.isAdmin ? [...PROGRAMS] : access.visiblePrograms;
 
   return (
@@ -20,9 +24,9 @@ export default async function AdhocPage() {
             <span className="font-medium">#instructor-adhoc-request-1</span>.
           </p>
         </div>
-        <AdhocForm variant="solid" allowedPrograms={allowedPrograms} />
+        <AdhocForm variant="solid" people={people} allowedPrograms={allowedPrograms} />
       </div>
-      <AdhocList requests={requests} />
+      <AdhocList requests={requests} people={people} />
     </div>
   );
 }
