@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { X, Plus } from "lucide-react";
+import { X, Plus, Trash2 } from "lucide-react";
 
 // Free-text multi-select. Suggests existing values as you type and lets you create a
 // new one (Enter / comma / "Create" row). Emits hidden <input name={fieldName}> per value.
@@ -13,6 +13,7 @@ export function TagSelect({
   chipClass = "bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300 hover:bg-violet-200/60 dark:hover:bg-violet-900",
   prefix = "#",
   allowCreate = true,
+  onDelete,
 }: {
   suggestions: string[];
   defaultTags?: string[];
@@ -21,6 +22,9 @@ export function TagSelect({
   chipClass?: string;
   prefix?: string;
   allowCreate?: boolean;
+  // When set, each suggestion in the dropdown gets a trash button to delete it
+  // globally (admins only, for metrics). The caller confirms + persists.
+  onDelete?: (value: string) => void;
 }) {
   const [selected, setSelected] = useState<string[]>(defaultTags);
   const [query, setQuery] = useState("");
@@ -106,16 +110,28 @@ export function TagSelect({
       {open && (matches.length > 0 || canCreate) && (
         <ul className="absolute z-30 mt-1 w-full overflow-hidden rounded-lg border border-border bg-surface shadow-lg">
           {matches.map((t) => (
-            <li key={t}>
+            <li key={t} className="flex items-center">
               <button
                 type="button"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => add(t)}
-                className="flex w-full items-center px-3 py-2 text-left text-sm hover:bg-bg"
+                className="flex flex-1 items-center px-3 py-2 text-left text-sm hover:bg-bg"
               >
-                <span className="text-muted">#</span>
+                <span className="text-muted">{prefix}</span>
                 {t}
               </button>
+              {onDelete && (
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => onDelete(t)}
+                  title={`Delete “${t}” everywhere`}
+                  aria-label={`Delete ${t}`}
+                  className="mr-1 grid h-6 w-6 shrink-0 place-items-center rounded text-muted transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400"
+                >
+                  <Trash2 size={13} />
+                </button>
+              )}
             </li>
           ))}
           {canCreate && (

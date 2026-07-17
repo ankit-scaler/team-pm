@@ -102,3 +102,13 @@ export function distinctMetrics(tasks: Task[]): string[] {
   const used = tasks.flatMap((t) => t.metrics ?? []);
   return Array.from(new Set([...DEFAULT_METRICS, ...used]));
 }
+
+// The metric registry (single source of truth for pickers). Admins add/delete
+// these; everyone else picks from them. Falls back to the built-in defaults if
+// the table isn't there yet (pre-migration) so pickers never come up empty.
+export async function getMetricNames(): Promise<string[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase.from("metrics").select("name").order("name");
+  if (error || !data) return [...DEFAULT_METRICS];
+  return data.map((r: any) => r.name as string);
+}

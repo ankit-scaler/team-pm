@@ -1,4 +1,4 @@
-import { getPeople, getTasks, getAdhocRequests, distinctTags, distinctMetrics } from "@/lib/queries";
+import { getPeople, getTasks, getAdhocRequests, distinctTags, getMetricNames } from "@/lib/queries";
 import { getMyAccess } from "@/lib/access";
 import { PROGRAMS } from "@/lib/types";
 import { KanbanBoard } from "../../components/kanban-board";
@@ -8,16 +8,14 @@ import { AdhocForm } from "../../components/adhoc-form";
 export const dynamic = "force-dynamic";
 
 export default async function BoardPage() {
-  const [tasks, people, adhocRequests, access] = await Promise.all([
+  const [tasks, people, adhocRequests, access, allMetrics] = await Promise.all([
     getTasks(),
     getPeople(),
     getAdhocRequests(),
     getMyAccess(),
+    getMetricNames(),
   ]);
   const allTags = distinctTags(tasks);
-  const allMetrics = Array.from(
-    new Set([...distinctMetrics(tasks), ...adhocRequests.flatMap((a) => a.metrics ?? [])])
-  );
   const allowedPrograms = access.isAdmin ? [...PROGRAMS] : access.visiblePrograms;
 
   return (

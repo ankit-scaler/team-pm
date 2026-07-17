@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Pencil, Plus, X } from "lucide-react";
-import { createAdhocRequest, updateAdhocRequest } from "../(app)/actions";
+import { createAdhocRequest, updateAdhocRequest, deleteMetric } from "../(app)/actions";
 import { Loader } from "./loader";
 import { TagSelect } from "./tag-select";
 import { PROGRAMS, STATUSES, type AdhocRequest, type Profile } from "@/lib/types";
@@ -31,7 +32,17 @@ export function AdhocForm({
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const router = useRouter();
   const isEdit = Boolean(request);
+
+  function onDeleteMetric(name: string) {
+    if (!confirm(`Delete the metric “${name}” everywhere?\nIt will be removed from every task and adhoc request.`))
+      return;
+    startTransition(async () => {
+      await deleteMetric(name);
+      router.refresh();
+    });
+  }
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -189,7 +200,7 @@ export function AdhocForm({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className={labelCls}>Which Module Owner should review this? (assignee)</label>
+                  <label className={labelCls}>Who should review this? (assignee)</label>
                   <select name="assignee_id" defaultValue={request?.assignee_id ?? ""} className={fieldCls}>
                     <option value="">Unassigned</option>
                     {people.map((p) => (
@@ -220,6 +231,7 @@ export function AdhocForm({
                   placeholder={canCreateMetrics ? "Select or add metrics…" : "Select metrics…"}
                   prefix=""
                   allowCreate={canCreateMetrics}
+                  onDelete={canCreateMetrics ? onDeleteMetric : undefined}
                   chipClass="bg-cyan-100 text-cyan-700 dark:bg-cyan-950 dark:text-cyan-300 hover:bg-cyan-200/60 dark:hover:bg-cyan-900"
                 />
               </div>

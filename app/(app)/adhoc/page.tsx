@@ -1,21 +1,19 @@
-import { getAdhocRequests, getPeople } from "@/lib/queries";
+import { getAdhocRequests, getPeople, getMetricNames } from "@/lib/queries";
 import { getMyAccess } from "@/lib/access";
-import { DEFAULT_METRICS, PROGRAMS } from "@/lib/types";
+import { PROGRAMS } from "@/lib/types";
 import { AdhocList } from "../../components/adhoc-list";
 import { AdhocForm } from "../../components/adhoc-form";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdhocPage() {
-  const [requests, people, access] = await Promise.all([
+  const [requests, people, access, allMetrics] = await Promise.all([
     getAdhocRequests(),
     getPeople(),
     getMyAccess(),
+    getMetricNames(),
   ]);
   const allowedPrograms = access.isAdmin ? [...PROGRAMS] : access.visiblePrograms;
-  const allMetrics = Array.from(
-    new Set([...DEFAULT_METRICS, ...requests.flatMap((r) => r.metrics ?? [])])
-  );
 
   return (
     <div className="space-y-5">

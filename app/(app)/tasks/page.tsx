@@ -1,4 +1,4 @@
-import { getPeople, getTasks, distinctTags, distinctMetrics } from "@/lib/queries";
+import { getPeople, getTasks, distinctTags, getMetricNames } from "@/lib/queries";
 import { getMyAccess } from "@/lib/access";
 import { PROGRAMS } from "@/lib/types";
 import { TaskTable } from "../../components/task-table";
@@ -8,9 +8,13 @@ import { AdhocForm } from "../../components/adhoc-form";
 export const dynamic = "force-dynamic";
 
 export default async function TasksPage() {
-  const [tasks, people, access] = await Promise.all([getTasks(), getPeople(), getMyAccess()]);
+  const [tasks, people, access, allMetrics] = await Promise.all([
+    getTasks(),
+    getPeople(),
+    getMyAccess(),
+    getMetricNames(),
+  ]);
   const allTags = distinctTags(tasks);
-  const allMetrics = distinctMetrics(tasks);
   const allowedPrograms = access.isAdmin ? [...PROGRAMS] : access.visiblePrograms;
 
   return (

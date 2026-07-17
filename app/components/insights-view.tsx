@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { PROGRAMS, type Task } from "@/lib/types";
+import { PROGRAMS, type AdhocRequest, type Profile, type Task } from "@/lib/types";
 
 type PersonStat = {
   id: string;
@@ -10,51 +10,90 @@ type PersonStat = {
   completed: number;
   inProgress: number;
   overdue: number;
-  totalDays: number;
-  doneWithDays: number;
+};
+
+// Common shape so tasks and adhoc are counted the same way.
+type WorkItem = {
+  assignee_id: string | null;
+  assignee: Profile | null | undefined;
+  status: string;
+  eta: string | null;
+  program: string | null;
 };
 
 const selCls = "rounded-lg border border-border bg-surface px-2.5 py-1.5 text-sm outline-none";
 
-export function InsightsView({ tasks }: { tasks: Task[] }) {
+// "2026-07" → "Jul 2026"
+function fmtMonth(ym: string) {
+  const [y, m] = ym.split("-").map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: "short", year: "numeric" });
+}
+const openCalendar = (e: React.MouseEvent<HTMLInputElement>) =>
+  (e.currentTarget as any).showPicker?.();
+
+export function InsightsView({ tasks, adhoc = [] }: { tasks: Task[]; adhoc?: AdhocRequest[] }) {
   const [program, setProgram] = useState("");
+  const [month, setMonth] = useState(""); // YYYY-MM, matched against ETA
+  const [etaFrom, setEtaFrom] = useState("");
+  const [etaTo, setEtaTo] = useState("");
 
   const today = useMemo(() => new Date(new Date().toDateString()), []);
-  const isOverdue = (t: Task) =>
-    !!t.eta && t.status !== "Completed" && new Date(t.eta + "T00:00:00") < today;
+  const isOverdue = (i: WorkItem) =>
+    !!i.eta && i.status !== "Completed" && new Date(i.eta + "T00:00:00") < today;
+
+  // Tasks + adhoc, normalized into one list.
+  const items = useMemo<WorkItem[]>(
+    () => [
+      ...tasks.map((t) => ({
+        assignee_id: t.assignee_id,
+        assignee: t.assignee,
+        status: t.status,
+        eta: t.eta,
+        program: t.program,
+      })),
+      ...adhoc.map((a) => ({
+        assignee_id: a.assignee_id,
+        assignee: a.assignee,
+        status: a.status,
+        eta: a.eta,
+        program: a.program,
+      })),
+    ],
+    [tasks, adhoc]
+  );
+
+  // Distinct ETA months present, newest first — powers the Month dropdown.
+  const monthOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const i of items) if (i.eta) set.add(i.eta.slice(0, 7));
+    return Array.from(set).sort().reverse();
+  }, [items]);
 
   const filtered = useMemo(
-    () => (program ? tasks.filter((t) => t.program === program) : tasks),
-    [tasks, program]
+    () =>
+      items.filter((i) => {
+        if (program && i.program !== program) return false;
+        if (month && (!i.eta || !i.eta.startsWith(month))) return false;
+        if (etaFrom && (!i.eta || i.eta < etaFrom)) return false;
+        if (etaTo && (!i.eta || i.eta > etaTo)) return false;
+        return true;
+      }),
+    [items, program, month, etaFrom, etaTo]
   );
 
   const stats = useMemo(() => {
     const map = new Map<string, PersonStat>();
-    for (const t of filtered) {
-      if (!t.assignee_id) continue;
-      const name = t.assignee?.full_name ?? t.assignee?.email ?? "Unknown";
+    for (const i of filtered) {
+      if (!i.assignee_id) continue;
+      const name = i.assignee?.full_name ?? i.assignee?.email ?? "Unknown";
       const s =
-        map.get(t.assignee_id) ??
-        { id: t.assignee_id, name, assigned: 0, completed: 0, inProgress: 0, overdue: 0, totalDays: 0, doneWithDays: 0 };
+        map.get(i.assignee_id) ??
+        { id: i.assignee_id, name, assigned: 0, completed: 0, inProgress: 0, overdue: 0 };
       s.assigned++;
-      if (t.status === "Completed") {
-        s.completed++;
-        if (t.picked_date && t.delivered_date) {
-          // Compare whole days (picked_date is a timestamp, delivered_date a date)
-          // so same-day completions count as 0 instead of being dropped as negative.
-          const picked = new Date(t.picked_date.slice(0, 10) + "T00:00:00").getTime();
-          const delivered = new Date(t.delivered_date + "T00:00:00").getTime();
-          const days = Math.round((delivered - picked) / 86_400_000);
-          if (days >= 0) {
-            s.totalDays += days;
-            s.doneWithDays++;
-          }
-        }
-      } else if (t.status === "Working" || t.status === "In Review") {
-        s.inProgress++;
-      }
-      if (isOverdue(t)) s.overdue++;
-      map.set(t.assignee_id, s);
+      if (i.status === "Completed") s.completed++;
+      else if (i.status === "Working" || i.status === "In Review") s.inProgress++;
+      if (isOverdue(i)) s.overdue++;
+      map.set(i.assignee_id, s);
     }
     return Array.from(map.values()).sort((a, b) => b.completed - a.completed || b.assigned - a.assigned);
   }, [filtered, today]);
@@ -80,8 +119,27 @@ export function InsightsView({ tasks }: { tasks: Task[] }) {
             <option key={p} value={p}>{p}</option>
           ))}
         </select>
-        {program && (
-          <button type="button" onClick={() => setProgram("")} className="text-xs text-accent hover:underline">
+        <select value={month} onChange={(e) => setMonth(e.target.value)} title="Filter by ETA month" className={selCls}>
+          <option value="">Any month</option>
+          {monthOptions.map((m) => (
+            <option key={m} value={m}>{fmtMonth(m)}</option>
+          ))}
+        </select>
+        <span className="text-sm text-muted">ETA</span>
+        <input type="date" value={etaFrom} onChange={(e) => setEtaFrom(e.target.value)} onClick={openCalendar} className={`${selCls} cursor-pointer`} />
+        <span className="text-sm text-muted">to</span>
+        <input type="date" value={etaTo} onChange={(e) => setEtaTo(e.target.value)} onClick={openCalendar} className={`${selCls} cursor-pointer`} />
+        {(program || month || etaFrom || etaTo) && (
+          <button
+            type="button"
+            onClick={() => {
+              setProgram("");
+              setMonth("");
+              setEtaFrom("");
+              setEtaTo("");
+            }}
+            className="text-xs text-accent hover:underline"
+          >
             Clear
           </button>
         )}
@@ -90,7 +148,7 @@ export function InsightsView({ tasks }: { tasks: Task[] }) {
       {/* Summary */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat label="People active" value={totals.people} />
-        <Stat label="Tasks" value={totals.assigned} />
+        <Stat label="Tasks + adhoc" value={totals.assigned} />
         <Stat label="Completed" value={totals.completed} />
         <Stat label="Overdue" value={totals.overdue} tone="danger" />
       </div>
@@ -98,7 +156,7 @@ export function InsightsView({ tasks }: { tasks: Task[] }) {
       {/* Per-person */}
       <div className="rounded-xl border border-border bg-surface">
         <div className="border-b border-border px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-muted">
-          By person — completed vs assigned
+          By person — completed vs assigned (tasks + adhoc)
         </div>
         {stats.length === 0 ? (
           <p className="px-4 py-10 text-center text-sm text-muted">No assigned tasks in this view.</p>
@@ -108,7 +166,6 @@ export function InsightsView({ tasks }: { tasks: Task[] }) {
               const rate = s.assigned ? Math.round((s.completed / s.assigned) * 100) : 0;
               const barWidth = (s.assigned / maxAssigned) * 100; // volume
               const fillWidth = s.assigned ? (s.completed / s.assigned) * 100 : 0; // completion within volume
-              const avg = s.doneWithDays ? (s.totalDays / s.doneWithDays).toFixed(1) : "—";
               return (
                 <div key={s.id} className="px-4 py-3">
                   <div className="mb-1.5 flex items-center justify-between gap-3">
@@ -119,7 +176,6 @@ export function InsightsView({ tasks }: { tasks: Task[] }) {
                       {s.overdue > 0 && (
                         <span className="text-red-600 dark:text-red-400"> · {s.overdue} overdue</span>
                       )}
-                      {avg !== "—" && ` · avg ${avg}d`}
                     </span>
                   </div>
                   <div className="h-2.5 w-full overflow-hidden rounded-full bg-surface-2">

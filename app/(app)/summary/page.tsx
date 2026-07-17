@@ -17,8 +17,8 @@ export default async function SummaryPage() {
       <div>
         <h1 className="text-xl font-bold tracking-tight">Program Summary</h1>
         <p className="text-sm text-muted">
-          Pick a program to see who worked on it (assignee or stakeholder), the tasks/adhoc they
-          touched, and how many times each metric came up.
+          Pick a program, then drill in: people → a person&apos;s metrics → the tasks/adhoc behind
+          each metric.
         </p>
       </div>
       <SummaryView tasks={tasks} adhoc={adhoc} />

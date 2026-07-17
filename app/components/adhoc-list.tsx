@@ -18,6 +18,19 @@ function displayTitle(r: AdhocRequest) {
   return r.title || r.module || r.program || "Adhoc request";
 }
 
+// Overdue: has an ETA, not done, deadline is in the past.
+function isOverdue(r: AdhocRequest) {
+  return (
+    !!r.eta &&
+    r.status !== "Completed" &&
+    new Date(r.eta + "T00:00:00") < new Date(new Date().toDateString())
+  );
+}
+// Delayed: finished, but delivered after its ETA.
+function isDelayed(r: AdhocRequest) {
+  return r.status === "Completed" && !!r.eta && !!r.delivered_date && r.delivered_date > r.eta;
+}
+
 export function AdhocList({ requests, people = [] }: { requests: AdhocRequest[]; people?: Profile[] }) {
   const [q, setQ] = useState("");
   const [program, setProgram] = useState("");
@@ -158,10 +171,26 @@ export function AdhocList({ requests, people = [] }: { requests: AdhocRequest[];
                 <td className="px-4 py-3 text-muted">{r.raised_by ?? "—"}</td>
                 <td className="px-4 py-3 text-muted">
                   {fmt(r.posted_at ?? r.created_at)}
-                  {r.eta && <div className="text-[11px]">ETA {fmt(r.eta)}</div>}
+                  {r.eta && (
+                    <div
+                      className={`text-[11px] ${
+                        isOverdue(r) ? "font-medium text-red-600 dark:text-red-400" : ""
+                      }`}
+                    >
+                      ETA {fmt(r.eta)}
+                      {isOverdue(r) && " · overdue"}
+                    </div>
+                  )}
                   {r.status === "Completed" && r.delivered_date && (
-                    <div className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
-                      Delivered {fmt(r.delivered_date)}
+                    <div className="mt-0.5 flex items-center gap-1.5">
+                      <span className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
+                        Delivered {fmt(r.delivered_date)}
+                      </span>
+                      {isDelayed(r) && (
+                        <span className="inline-flex items-center rounded border border-red-200 bg-red-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300">
+                          Delayed
+                        </span>
+                      )}
                     </div>
                   )}
                 </td>

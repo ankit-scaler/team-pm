@@ -1,12 +1,15 @@
-import { getPeople, getTasks, distinctTags, distinctMetrics } from "@/lib/queries";
+import { getPeople, getTasks, distinctTags, getMetricNames } from "@/lib/queries";
 import { ProgramTrackView } from "../../components/program-track-view";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProgramTrackPage() {
-  const [tasks, people] = await Promise.all([getTasks(), getPeople()]);
+  const [tasks, people, allMetrics] = await Promise.all([
+    getTasks(),
+    getPeople(),
+    getMetricNames(),
+  ]);
   const allTags = distinctTags(tasks);
-  const allMetrics = distinctMetrics(tasks);
 
   return (
     <div className="space-y-5">

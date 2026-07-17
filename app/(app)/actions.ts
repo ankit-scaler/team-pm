@@ -7,25 +7,50 @@ import { notifyStatusChange } from "@/lib/slack";
 import { syncTaskCalendarEvent, deleteTaskCalendarEvent } from "@/lib/google";
 import { getMyAccess } from "@/lib/access";
 import type { MembershipRole } from "@/lib/access";
-import { DEFAULT_METRICS, type Status } from "@/lib/types";
+import { type Status } from "@/lib/types";
+import { getMetricNames } from "@/lib/queries";
 
 // Only admins may create NEW metrics. For non-admins, drop any submitted metric
 // that isn't already a known one (the default seed list or one already in use).
 async function sanitizeMetrics(submitted: string[]): Promise<string[]> {
   if (submitted.length === 0) return submitted;
   const access = await getMyAccess();
-  if (access.isAdmin) return submitted;
-  const defaults = new Set(DEFAULT_METRICS.map((m) => m.toLowerCase()));
-  if (submitted.every((m) => defaults.has(m.toLowerCase()))) return submitted;
-  const supabase = createClient();
-  const [{ data: t }, { data: a }] = await Promise.all([
-    supabase.from("tasks").select("metrics"),
-    supabase.from("adhoc_requests").select("metrics"),
-  ]);
-  const known = new Set(defaults);
-  for (const row of [...(t ?? []), ...(a ?? [])])
-    for (const m of ((row as any).metrics ?? []) as string[]) known.add(m.toLowerCase());
-  return submitted.filter((m) => known.has(m.toLowerCase()));
+
+  // Known metrics = the registry table.
+  const known = await getMetricNames();
+  const knownLower = new Set(known.map((m) => m.toLowerCase()));
+
+  if (access.isAdmin) {
+    // Admins may introduce new metrics — register any that aren't in the table
+    // yet so they show up in every picker from now on.
+    const fresh = submitted.filter((m) => m.trim() && !knownLower.has(m.trim().toLowerCase()));
+    if (fresh.length) {
+      const admin = createAdminClient();
+      await admin
+        .from("metrics")
+        .upsert(fresh.map((name) => ({ name: name.trim() })), { onConflict: "name" });
+    }
+    return submitted;
+  }
+
+  // Non-admins may only use metrics that already exist in the registry.
+  return submitted.filter((m) => knownLower.has(m.trim().toLowerCase()));
+}
+
+// Delete a metric globally (admin only): drops it from the registry and strips
+// it off every task/adhoc that carries it. Runs via the security-definer RPC.
+export async function deleteMetric(name: string) {
+  await requireAdmin();
+  const clean = name.trim();
+  if (!clean) return;
+  const admin = createAdminClient();
+  const { error } = await admin.rpc("delete_metric", { p_metric: clean });
+  if (error) throw new Error(error.message);
+  revalidatePath("/board");
+  revalidatePath("/tasks");
+  revalidatePath("/adhoc");
+  revalidatePath("/summary");
+  revalidatePath("/program-track");
 }
 
 // RBAC guard: a non-admin may only act within programs they belong to.
