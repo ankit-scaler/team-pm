@@ -31,7 +31,7 @@ export function Nav({
   const links = [
     ...BASE_LINKS,
     ...(isManager ? [{ href: "/admin", label: "Team" }] : []),
-    ...(isAdmin ? [{ href: "/insights", label: "Insights" }] : []),
+    ...(isAdmin ? [{ href: "/insights", label: "Insights" }, { href: "/summary", label: "Summary" }] : []),
   ];
 
   return (

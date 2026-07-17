@@ -15,7 +15,9 @@ export default async function BoardPage() {
     getMyAccess(),
   ]);
   const allTags = distinctTags(tasks);
-  const allMetrics = distinctMetrics(tasks);
+  const allMetrics = Array.from(
+    new Set([...distinctMetrics(tasks), ...adhocRequests.flatMap((a) => a.metrics ?? [])])
+  );
   const allowedPrograms = access.isAdmin ? [...PROGRAMS] : access.visiblePrograms;
 
   return (
@@ -26,8 +28,8 @@ export default async function BoardPage() {
           <p className="text-sm text-muted">Move work across stages. New tasks and status changes notify Slack.</p>
         </div>
         <div className="flex items-center gap-2">
-          <AdhocForm variant="outline" people={people} allowedPrograms={allowedPrograms} />
-          <TaskForm people={people} allTags={allTags} allMetrics={allMetrics} allowedPrograms={allowedPrograms} />
+          <AdhocForm variant="outline" people={people} allowedPrograms={allowedPrograms} allMetrics={allMetrics} canCreateMetrics={access.isAdmin} />
+          <TaskForm people={people} allTags={allTags} allMetrics={allMetrics} allowedPrograms={allowedPrograms} canCreateMetrics={access.isAdmin} />
         </div>
       </div>
       <KanbanBoard

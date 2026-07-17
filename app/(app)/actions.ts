@@ -7,7 +7,26 @@ import { notifyStatusChange } from "@/lib/slack";
 import { syncTaskCalendarEvent, deleteTaskCalendarEvent } from "@/lib/google";
 import { getMyAccess } from "@/lib/access";
 import type { MembershipRole } from "@/lib/access";
-import type { Status } from "@/lib/types";
+import { DEFAULT_METRICS, type Status } from "@/lib/types";
+
+// Only admins may create NEW metrics. For non-admins, drop any submitted metric
+// that isn't already a known one (the default seed list or one already in use).
+async function sanitizeMetrics(submitted: string[]): Promise<string[]> {
+  if (submitted.length === 0) return submitted;
+  const access = await getMyAccess();
+  if (access.isAdmin) return submitted;
+  const defaults = new Set(DEFAULT_METRICS.map((m) => m.toLowerCase()));
+  if (submitted.every((m) => defaults.has(m.toLowerCase()))) return submitted;
+  const supabase = createClient();
+  const [{ data: t }, { data: a }] = await Promise.all([
+    supabase.from("tasks").select("metrics"),
+    supabase.from("adhoc_requests").select("metrics"),
+  ]);
+  const known = new Set(defaults);
+  for (const row of [...(t ?? []), ...(a ?? [])])
+    for (const m of ((row as any).metrics ?? []) as string[]) known.add(m.toLowerCase());
+  return submitted.filter((m) => known.has(m.toLowerCase()));
+}
 
 // RBAC guard: a non-admin may only act within programs they belong to.
 async function assertProgramAllowed(program: string | null) {
@@ -128,6 +147,7 @@ export async function createTask(formData: FormData) {
 
   const status = (str(formData.get("status")) ?? "To pick") as Status;
   const stakeholderIds = formData.getAll("stakeholders").map(String).filter(Boolean);
+  const metrics = await sanitizeMetrics(parseMultiValue(formData, "metrics"));
 
   const { data: task, error } = await supabase
     .from("tasks")
@@ -141,7 +161,7 @@ export async function createTask(formData: FormData) {
       assignee_id: str(formData.get("assignee_id")),
       delivered_date: str(formData.get("delivered_date")),
       tags: parseMultiValue(formData, "tags"),
-      metrics: parseMultiValue(formData, "metrics"),
+      metrics,
       slack_link: str(formData.get("slack_link")),
       sheet_link: str(formData.get("sheet_link")),
       program: str(formData.get("program")),
@@ -215,6 +235,7 @@ export async function updateTask(taskId: string, formData: FormData) {
 
   const newStatus = (str(formData.get("status")) ?? "To pick") as Status;
   const stakeholderIds = formData.getAll("stakeholders").map(String).filter(Boolean);
+  const metrics = await sanitizeMetrics(parseMultiValue(formData, "metrics"));
 
   const { error } = await supabase
     .from("tasks")
@@ -228,7 +249,7 @@ export async function updateTask(taskId: string, formData: FormData) {
       assignee_id: str(formData.get("assignee_id")),
       delivered_date: str(formData.get("delivered_date")),
       tags: parseMultiValue(formData, "tags"),
-      metrics: parseMultiValue(formData, "metrics"),
+      metrics,
       slack_link: str(formData.get("slack_link")),
       sheet_link: str(formData.get("sheet_link")),
       program: str(formData.get("program")),
@@ -357,6 +378,7 @@ export async function createAdhocRequest(formData: FormData) {
   const assigneeId = str(formData.get("assignee_id"));
   const moduleOwner = await nameForProfile(assigneeId); // keep text in sync with assignee
   const stakeholder = str(formData.get("stakeholder"));
+  const metrics = await sanitizeMetrics(parseMultiValue(formData, "metrics"));
 
   const { data: created, error } = await supabase
     .from("adhoc_requests")
@@ -364,6 +386,7 @@ export async function createAdhocRequest(formData: FormData) {
       source: "manual",
       status: (str(formData.get("status")) ?? "To pick") as Status,
       eta,
+      metrics,
       assignee_id: assigneeId,
       permalink: str(formData.get("slack_link")),
       title: str(formData.get("title")),
@@ -427,6 +450,7 @@ export async function updateAdhocRequest(id: string, formData: FormData) {
   const assigneeId = str(formData.get("assignee_id"));
   const moduleOwner = await nameForProfile(assigneeId);
   const stakeholder = str(formData.get("stakeholder"));
+  const metrics = await sanitizeMetrics(parseMultiValue(formData, "metrics"));
 
   const { error } = await supabase
     .from("adhoc_requests")
@@ -434,6 +458,7 @@ export async function updateAdhocRequest(id: string, formData: FormData) {
       status,
       eta,
       title,
+      metrics,
       assignee_id: assigneeId,
       permalink: str(formData.get("slack_link")),
       program: str(formData.get("program")),

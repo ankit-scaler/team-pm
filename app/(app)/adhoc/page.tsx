@@ -1,6 +1,6 @@
 import { getAdhocRequests, getPeople } from "@/lib/queries";
 import { getMyAccess } from "@/lib/access";
-import { PROGRAMS } from "@/lib/types";
+import { DEFAULT_METRICS, PROGRAMS } from "@/lib/types";
 import { AdhocList } from "../../components/adhoc-list";
 import { AdhocForm } from "../../components/adhoc-form";
 
@@ -13,6 +13,9 @@ export default async function AdhocPage() {
     getMyAccess(),
   ]);
   const allowedPrograms = access.isAdmin ? [...PROGRAMS] : access.visiblePrograms;
+  const allMetrics = Array.from(
+    new Set([...DEFAULT_METRICS, ...requests.flatMap((r) => r.metrics ?? [])])
+  );
 
   return (
     <div className="space-y-5">
@@ -24,7 +27,7 @@ export default async function AdhocPage() {
             <span className="font-medium">#instructor-adhoc-request-1</span>.
           </p>
         </div>
-        <AdhocForm variant="solid" people={people} allowedPrograms={allowedPrograms} />
+        <AdhocForm variant="solid" people={people} allowedPrograms={allowedPrograms} allMetrics={allMetrics} canCreateMetrics={access.isAdmin} />
       </div>
       <AdhocList requests={requests} people={people} />
     </div>

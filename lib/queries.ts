@@ -69,7 +69,7 @@ export async function getAdhocRequests(): Promise<AdhocRequest[]> {
   let query = supabase
     .from("adhoc_requests")
     .select(
-      `id, source, status, eta, delivered_date, assignee_id, slack_ts, permalink, title, posted_at, created_at, raised_by, program, batch, module, beneficiary, problem, learners_impact, risk_if_not_done, outcome, module_owner, stakeholder,
+      `id, source, status, eta, delivered_date, metrics, assignee_id, slack_ts, permalink, title, posted_at, created_at, raised_by, program, batch, module, beneficiary, problem, learners_impact, risk_if_not_done, outcome, module_owner, stakeholder,
        assignee:profiles!adhoc_requests_assignee_id_fkey (${PROFILE_COLS})`
     )
     .order("created_at", { ascending: false });
@@ -85,6 +85,7 @@ export async function getAdhocRequests(): Promise<AdhocRequest[]> {
   }
   return (data ?? []).map((row: any) => ({
     ...row,
+    metrics: row.metrics ?? [],
     assignee: row.assignee ?? null,
   })) as AdhocRequest[];
 }

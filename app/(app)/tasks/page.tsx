@@ -21,8 +21,8 @@ export default async function TasksPage() {
           <p className="text-sm text-muted">{tasks.length} tasks · filter by stage, person, tag, or ETA.</p>
         </div>
         <div className="flex items-center gap-2">
-          <AdhocForm variant="outline" people={people} allowedPrograms={allowedPrograms} />
-          <TaskForm people={people} allTags={allTags} allMetrics={allMetrics} allowedPrograms={allowedPrograms} />
+          <AdhocForm variant="outline" people={people} allowedPrograms={allowedPrograms} allMetrics={allMetrics} canCreateMetrics={access.isAdmin} />
+          <TaskForm people={people} allTags={allTags} allMetrics={allMetrics} allowedPrograms={allowedPrograms} canCreateMetrics={access.isAdmin} />
         </div>
       </div>
       <TaskTable tasks={tasks} people={people} allTags={allTags} allMetrics={allMetrics} />

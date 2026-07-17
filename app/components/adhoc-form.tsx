@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { Pencil, Plus, X } from "lucide-react";
 import { createAdhocRequest, updateAdhocRequest } from "../(app)/actions";
 import { Loader } from "./loader";
+import { TagSelect } from "./tag-select";
 import { PROGRAMS, STATUSES, type AdhocRequest, type Profile } from "@/lib/types";
 
 const fieldCls =
@@ -16,12 +17,16 @@ export function AdhocForm({
   triggerClassName,
   people = [],
   allowedPrograms = PROGRAMS as unknown as string[],
+  allMetrics = [],
+  canCreateMetrics = false,
 }: {
   variant?: "solid" | "outline";
   request?: AdhocRequest;
   triggerClassName?: string;
   people?: Profile[];
   allowedPrograms?: string[];
+  allMetrics?: string[];
+  canCreateMetrics?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -202,6 +207,21 @@ export function AdhocForm({
                     })}
                   </select>
                 </div>
+              </div>
+
+              <div>
+                <label className={labelCls}>
+                  Metrics{!canCreateMetrics && <span className="ml-1 text-muted">(select from list)</span>}
+                </label>
+                <TagSelect
+                  suggestions={allMetrics}
+                  defaultTags={request?.metrics ?? []}
+                  fieldName="metrics"
+                  placeholder={canCreateMetrics ? "Select or add metrics…" : "Select metrics…"}
+                  prefix=""
+                  allowCreate={canCreateMetrics}
+                  chipClass="bg-cyan-100 text-cyan-700 dark:bg-cyan-950 dark:text-cyan-300 hover:bg-cyan-200/60 dark:hover:bg-cyan-900"
+                />
               </div>
 
               <div>

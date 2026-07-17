@@ -12,6 +12,7 @@ export function TagSelect({
   placeholder = "Add tags…",
   chipClass = "bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300 hover:bg-violet-200/60 dark:hover:bg-violet-900",
   prefix = "#",
+  allowCreate = true,
 }: {
   suggestions: string[];
   defaultTags?: string[];
@@ -19,6 +20,7 @@ export function TagSelect({
   placeholder?: string;
   chipClass?: string;
   prefix?: string;
+  allowCreate?: boolean;
 }) {
   const [selected, setSelected] = useState<string[]>(defaultTags);
   const [query, setQuery] = useState("");
@@ -35,6 +37,7 @@ export function TagSelect({
   }, [suggestions, selected, q]);
 
   const canCreate =
+    allowCreate &&
     q.length > 0 &&
     !selected.some((t) => t.toLowerCase() === q.toLowerCase()) &&
     !suggestions.some((t) => t.toLowerCase() === q.toLowerCase());
@@ -42,6 +45,8 @@ export function TagSelect({
   function add(tag: string) {
     const clean = tag.trim();
     if (!clean || selected.some((t) => t.toLowerCase() === clean.toLowerCase())) return;
+    // When creating new values isn't allowed, only accept existing suggestions.
+    if (!allowCreate && !suggestions.some((s) => s.toLowerCase() === clean.toLowerCase())) return;
     setSelected((s) => [...s, clean]);
     setQuery("");
     inputRef.current?.focus();
