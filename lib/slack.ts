@@ -95,7 +95,9 @@ async function getChannelMembers(channel: string): Promise<Member[]> {
     members.push({ id, names });
   }
 
-  membersCache = { at: Date.now(), channel, members };
+  // Only cache a non-empty result — otherwise a transient Slack failure would
+  // poison the cache with [] for the full TTL and silently drop all mentions.
+  if (members.length > 0) membersCache = { at: Date.now(), channel, members };
   return members;
 }
 
@@ -128,18 +130,28 @@ function matchScore(name: string, member: Member): number {
   return best;
 }
 
-// Best-guess: return the closest member id (requires at least some overlap).
+// Return the closest member id — but only on a CONFIDENT, unambiguous match, so
+// we never @-mention the wrong person when the real one isn't in the channel or
+// two people are similarly close.
+const MATCH_MIN = 0.6; // require a strong match (full name / handle / substring)
+const MATCH_MARGIN = 0.1; // top two must be clearly separated
 function bestMatch(name: string, members: Member[]): string | null {
   let bestId: string | null = null;
   let bestScore = 0;
+  let secondScore = 0;
   for (const m of members) {
     const s = matchScore(name, m);
     if (s > bestScore) {
+      secondScore = bestScore;
       bestScore = s;
       bestId = m.id;
+    } else if (s > secondScore) {
+      secondScore = s;
     }
   }
-  return bestScore > 0 ? bestId : null;
+  if (bestScore < MATCH_MIN) return null; // too weak — don't guess
+  if (bestScore - secondScore < MATCH_MARGIN) return null; // ambiguous — two plausible people
+  return bestId;
 }
 
 // Pull plausible person names out of "(...)" brackets in the message text.

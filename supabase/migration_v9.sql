@@ -9,5 +9,6 @@ alter table public.adhoc_requests
   add column if not exists calendar_event_id text;
 
 -- Let signed-in team members delete adhoc requests from the UI.
+drop policy if exists "adhoc deletable by authenticated" on public.adhoc_requests;
 create policy "adhoc deletable by authenticated"
   on public.adhoc_requests for delete to authenticated using (true);

@@ -13,8 +13,9 @@ function verifySignature(raw: string, ts: string | null, sig: string | null): bo
   const secret = process.env.SLACK_SIGNING_SECRET;
   if (!secret) return false;
   if (!ts || !sig) return false;
-  // Reject stale requests (>5 min) to prevent replay.
-  if (Math.abs(Date.now() / 1000 - Number(ts)) > 60 * 5) return false;
+  const tsNum = Number(ts);
+  // Reject non-numeric or stale (>5 min) timestamps to prevent replay.
+  if (!Number.isFinite(tsNum) || Math.abs(Date.now() / 1000 - tsNum) > 60 * 5) return false;
   const base = `v0:${ts}:${raw}`;
   const expected = "v0=" + crypto.createHmac("sha256", secret).update(base).digest("hex");
   try {
@@ -37,12 +38,16 @@ const userNameCache = new Map<string, string>();
 async function resolveMentions(text: string): Promise<string> {
   const ids = Array.from(text.matchAll(/<@([A-Z0-9]+)(?:\|[^>]+)?>/g)).map((m) => m[1]);
   const unique = Array.from(new Set(ids));
-  for (const id of unique) {
-    if (userNameCache.has(id)) continue;
-    const r = await slackApi("users.info", { user: id });
-    const p = r?.user?.profile ?? {};
-    userNameCache.set(id, r?.user?.real_name ?? p.display_name ?? p.real_name ?? id);
-  }
+  // Resolve in parallel to stay well under Slack's ~3s ack deadline.
+  await Promise.all(
+    unique
+      .filter((id) => !userNameCache.has(id))
+      .map(async (id) => {
+        const r = await slackApi("users.info", { user: id });
+        const p = r?.user?.profile ?? {};
+        userNameCache.set(id, r?.user?.real_name ?? p.display_name ?? p.real_name ?? id);
+      })
+  );
   return text.replace(/<@([A-Z0-9]+)(?:\|[^>]+)?>/g, (_m, id) => `@${userNameCache.get(id) ?? id}`);
 }
 
@@ -71,11 +76,13 @@ export async function POST(request: Request) {
     try {
       await handleEvent(payload.event);
     } catch (e) {
+      // Return non-2xx so Slack redelivers; storage is idempotent (unique
+      // slack_ts), so a retry can't create duplicates.
       console.error("slack events handler error:", e);
+      return NextResponse.json({ ok: false }, { status: 500 });
     }
   }
 
-  // Always 200 fast; work is idempotent (dedup on slack_ts) so retries are safe.
   return NextResponse.json({ ok: true });
 }
 
