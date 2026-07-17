@@ -79,6 +79,29 @@ export async function POST(request: Request) {
   return NextResponse.json({ ok: true });
 }
 
+// Fuzzy-match a name (e.g. the parsed Module Owner) to a team profile id, so a
+// Slack-fed adhoc gets a real assignee. Returns null if no confident match.
+async function profileIdForName(admin: any, name: string | null): Promise<string | null> {
+  if (!name) return null;
+  const { data } = await admin.from("profiles").select("id, full_name, email");
+  const profiles = (data ?? []) as { id: string; full_name: string | null; email: string }[];
+  const norm = (s: string) =>
+    s.toLowerCase().replace(/\(.*?\)/g, " ").replace(/[^a-z\s]/g, " ").replace(/\s+/g, " ").trim();
+  const target = norm(name);
+  if (!target) return null;
+  const tt = target.split(" ").filter(Boolean);
+  let best: { id: string; score: number } | null = null;
+  for (const p of profiles) {
+    const cand = norm(p.full_name ?? p.email.split("@")[0]);
+    if (!cand) continue;
+    const ct = new Set(cand.split(" ").filter(Boolean));
+    let s = cand === target ? 1 : tt.filter((t) => ct.has(t)).length / Math.max(tt.length, 1);
+    if (cand.includes(target) || target.includes(cand)) s = Math.max(s, 0.85);
+    if (!best || s > best.score) best = { id: p.id, score: s };
+  }
+  return best && best.score >= 0.5 ? best.id : null;
+}
+
 async function handleEvent(event: any) {
   if (!event || event.type !== "message") return;
 
@@ -113,6 +136,8 @@ async function handleEvent(event: any) {
   }
 
   const posted_at = event.ts ? new Date(Number(event.ts) * 1000).toISOString() : null;
+  // Assignee = the Module Owner, matched to a team profile.
+  const assignee_id = await profileIdForName(admin, fields.module_owner);
 
   await admin.from("adhoc_requests").upsert(
     {
@@ -120,6 +145,7 @@ async function handleEvent(event: any) {
       slack_channel: event.channel,
       permalink,
       posted_at,
+      assignee_id,
       raw: fields as any,
       ...fields,
     },

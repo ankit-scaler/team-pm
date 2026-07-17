@@ -22,7 +22,7 @@ export default async function BoardPage() {
           <p className="text-sm text-muted">Move work across stages. New tasks and status changes notify Slack.</p>
         </div>
         <div className="flex items-center gap-2">
-          <AdhocForm variant="outline" />
+          <AdhocForm variant="outline" people={people} />
           <TaskForm people={people} allTags={allTags} allMetrics={allMetrics} />
         </div>
       </div>

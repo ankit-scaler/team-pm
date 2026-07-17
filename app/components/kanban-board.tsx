@@ -71,13 +71,14 @@ export function KanbanBoard({
   }, [tasks, assignee, tag, q]);
 
   // Adhoc requests appear on the board too, in their status column. They have no
-  // assignee/tags, so the person/tag filters simply hide them.
+  // tags, so the tag filter hides them; the person filter matches their assignee.
   const visibleAdhoc = useMemo(() => {
     if (tag) return [];
-    if (assignee && assignee !== "unassigned") return [];
     return adhocRequests.filter((a) => {
+      if (assignee === "unassigned" ? a.assignee_id : assignee && a.assignee_id !== assignee)
+        return false;
       if (q) {
-        const hay = [a.title, a.module, a.program, a.raised_by]
+        const hay = [a.title, a.module, a.program, a.raised_by, a.assignee?.full_name, a.assignee?.email]
           .filter(Boolean)
           .join(" ")
           .toLowerCase();
@@ -166,6 +167,7 @@ export function KanbanBoard({
                     key={a.id}
                     a={a}
                     col={col}
+                    people={people}
                     onMove={moveAdhoc}
                   />
                 ))}
@@ -312,10 +314,12 @@ export function KanbanBoard({
 function AdhocCard({
   a,
   col,
+  people,
   onMove,
 }: {
   a: AdhocRequest;
   col: Status;
+  people: Profile[];
   onMove: (a: AdhocRequest, dir: -1 | 1) => void;
 }) {
   const title = a.title || a.module || a.program || "Adhoc request";
@@ -332,6 +336,7 @@ function AdhocCard({
           <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
             <AdhocForm
               request={a}
+              people={people}
               triggerClassName="grid h-6 w-6 place-items-center rounded text-muted transition-colors hover:bg-surface-2 hover:text-fg"
             />
             <AdhocDeleteButton
@@ -385,15 +390,20 @@ function AdhocCard({
         </div>
       )}
 
-      <div className="mt-3 flex items-center justify-between border-t border-border pt-2.5">
-        <span className="truncate text-xs text-muted">
-          {a.raised_by ? (
-            <>
-              Raised by <span className="font-medium text-fg/70">{a.raised_by}</span>
-            </>
-          ) : (
-            "Adhoc request"
-          )}
+      <div className="mt-3 flex flex-col gap-1.5 border-t border-border pt-2.5">
+        {a.raised_by && (
+          <span className="text-[11px] text-muted">
+            Raised by <span className="font-medium text-fg/70">{a.raised_by}</span>
+          </span>
+        )}
+        <div className="flex items-center justify-between">
+        <span className="flex items-center gap-1.5 truncate text-xs">
+          <span className="grid h-5 w-5 flex-shrink-0 place-items-center rounded-full bg-accent-soft text-[10px] font-semibold text-accent">
+            {a.assignee ? (a.assignee.full_name ?? a.assignee.email)[0]?.toUpperCase() : "?"}
+          </span>
+          <span className="truncate font-medium text-fg/80">
+            {a.assignee ? (a.assignee.full_name ?? a.assignee.email) : "Unassigned"}
+          </span>
         </span>
         <div className="flex items-center gap-0.5">
           <button
@@ -414,6 +424,7 @@ function AdhocCard({
           >
             <ChevronRight size={14} />
           </button>
+        </div>
         </div>
       </div>
     </article>

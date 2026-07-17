@@ -18,7 +18,7 @@ export default async function TasksPage() {
           <p className="text-sm text-muted">{tasks.length} tasks · filter by stage, person, tag, or ETA.</p>
         </div>
         <div className="flex items-center gap-2">
-          <AdhocForm variant="outline" />
+          <AdhocForm variant="outline" people={people} />
           <TaskForm people={people} allTags={allTags} allMetrics={allMetrics} />
         </div>
       </div>

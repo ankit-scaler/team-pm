@@ -1,11 +1,11 @@
-import { getAdhocRequests } from "@/lib/queries";
+import { getAdhocRequests, getPeople } from "@/lib/queries";
 import { AdhocList } from "../../components/adhoc-list";
 import { AdhocForm } from "../../components/adhoc-form";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdhocPage() {
-  const requests = await getAdhocRequests();
+  const [requests, people] = await Promise.all([getAdhocRequests(), getPeople()]);
 
   return (
     <div className="space-y-5">
@@ -17,9 +17,9 @@ export default async function AdhocPage() {
             <span className="font-medium">#instructor-adhoc-request-1</span>.
           </p>
         </div>
-        <AdhocForm variant="solid" />
+        <AdhocForm variant="solid" people={people} />
       </div>
-      <AdhocList requests={requests} />
+      <AdhocList requests={requests} people={people} />
     </div>
   );
 }

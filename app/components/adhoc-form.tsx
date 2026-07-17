@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { Pencil, Plus, X } from "lucide-react";
 import { createAdhocRequest, updateAdhocRequest } from "../(app)/actions";
 import { Loader } from "./loader";
-import { PROGRAMS, STATUSES, type AdhocRequest } from "@/lib/types";
+import { PROGRAMS, STATUSES, type AdhocRequest, type Profile } from "@/lib/types";
 
 const fieldCls =
   "w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-fg outline-none transition-colors focus:border-accent hover:border-border-strong";
@@ -14,10 +14,12 @@ export function AdhocForm({
   variant = "solid",
   request,
   triggerClassName,
+  people = [],
 }: {
   variant?: "solid" | "outline";
   request?: AdhocRequest;
   triggerClassName?: string;
+  people?: Profile[];
 }) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -178,8 +180,13 @@ export function AdhocForm({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className={labelCls}>Module owner (reviewer)</label>
-                  <input name="module_owner" defaultValue={request?.module_owner ?? ""} placeholder="Name" className={fieldCls} />
+                  <label className={labelCls}>Module owner (assignee)</label>
+                  <select name="assignee_id" defaultValue={request?.assignee_id ?? ""} className={fieldCls}>
+                    <option value="">Unassigned</option>
+                    {people.map((p) => (
+                      <option key={p.id} value={p.id}>{p.full_name ?? p.email}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className={labelCls}>Stakeholder</label>
