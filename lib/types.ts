@@ -59,6 +59,9 @@ export type AdhocRequest = {
   status: Status;
   eta: string | null;
   delivered_date: string | null;
+  metrics: string[];
+  assignee_id: string | null;
+  assignee?: Profile | null;
   slack_ts: string | null;
   permalink: string | null;
   title: string | null;

@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Pencil, Plus, Trash2, X } from "lucide-react";
-import { createTask, updateTask, deleteTask } from "../(app)/actions";
+import { createTask, updateTask, deleteTask, deleteMetric } from "../(app)/actions";
 import { StakeholderSelect } from "./stakeholder-select";
 import { TagSelect } from "./tag-select";
 import { Loader } from "./loader";
@@ -17,16 +18,30 @@ export function TaskForm({
   task,
   allTags = [],
   allMetrics = [],
+  allowedPrograms = PROGRAMS as unknown as string[],
+  canCreateMetrics = false,
 }: {
   people: Profile[];
   task?: Task;
   allTags?: string[];
   allMetrics?: string[];
+  allowedPrograms?: string[];
+  canCreateMetrics?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const router = useRouter();
   const isEdit = Boolean(task);
+
+  function onDeleteMetric(name: string) {
+    if (!confirm(`Delete the metric “${name}” everywhere?\nIt will be removed from every task and adhoc request.`))
+      return;
+    startTransition(async () => {
+      await deleteMetric(name);
+      router.refresh();
+    });
+  }
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -174,7 +189,7 @@ export function TaskForm({
                   <label className={labelCls}>Program</label>
                   <select name="program" defaultValue={task?.program ?? ""} className={fieldCls}>
                     <option value="">—</option>
-                    {PROGRAMS.map((p) => (
+                    {allowedPrograms.map((p) => (
                       <option key={p} value={p}>{p}</option>
                     ))}
                   </select>
@@ -227,13 +242,17 @@ export function TaskForm({
               </div>
 
               <div>
-                <label className={labelCls}>Metrics</label>
+                <label className={labelCls}>
+                  Metrics{!canCreateMetrics && <span className="ml-1 font-normal text-muted">(select from list)</span>}
+                </label>
                 <TagSelect
                   suggestions={allMetrics}
                   defaultTags={task?.metrics ?? []}
                   fieldName="metrics"
-                  placeholder="Select or add metrics…"
+                  placeholder={canCreateMetrics ? "Select or add metrics…" : "Select metrics…"}
                   prefix=""
+                  allowCreate={canCreateMetrics}
+                  onDelete={canCreateMetrics ? onDeleteMetric : undefined}
                   chipClass="bg-cyan-100 text-cyan-700 dark:bg-cyan-950 dark:text-cyan-300 hover:bg-cyan-200/60 dark:hover:bg-cyan-900"
                 />
               </div>

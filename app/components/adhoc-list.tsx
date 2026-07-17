@@ -5,7 +5,7 @@ import { MessageSquare, Slack } from "lucide-react";
 import { StatusBadge } from "./status-badge";
 import { AdhocDeleteButton } from "./adhoc-delete-button";
 import { AdhocForm } from "./adhoc-form";
-import { PROGRAMS, type AdhocRequest } from "@/lib/types";
+import { PROGRAMS, type AdhocRequest, type Profile } from "@/lib/types";
 
 const selCls = "rounded-lg border border-border bg-surface px-2.5 py-1.5 text-sm outline-none";
 
@@ -18,17 +18,34 @@ function displayTitle(r: AdhocRequest) {
   return r.title || r.module || r.program || "Adhoc request";
 }
 
-export function AdhocList({ requests }: { requests: AdhocRequest[] }) {
+// Overdue: has an ETA, not done, deadline is in the past.
+function isOverdue(r: AdhocRequest) {
+  return (
+    !!r.eta &&
+    r.status !== "Completed" &&
+    new Date(r.eta + "T00:00:00") < new Date(new Date().toDateString())
+  );
+}
+// Delayed: finished, but delivered after its ETA.
+function isDelayed(r: AdhocRequest) {
+  return r.status === "Completed" && !!r.eta && !!r.delivered_date && r.delivered_date > r.eta;
+}
+
+export function AdhocList({ requests, people = [] }: { requests: AdhocRequest[]; people?: Profile[] }) {
   const [q, setQ] = useState("");
   const [program, setProgram] = useState("");
   const [source, setSource] = useState("");
+  const [assignee, setAssignee] = useState("");
 
   const filtered = useMemo(() => {
     return requests.filter((r) => {
       if (program && r.program !== program) return false;
       if (source && r.source !== source) return false;
+      if (assignee === "unassigned" ? r.assignee_id : assignee && r.assignee_id !== assignee)
+        return false;
       if (q) {
-        const hay = [r.title, r.module, r.problem, r.raised_by, r.batch, r.module_owner, r.stakeholder]
+        const hay = [r.title, r.module, r.problem, r.raised_by, r.batch, r.module_owner, r.stakeholder,
+          r.assignee?.full_name, r.assignee?.email]
           .filter(Boolean)
           .join(" ")
           .toLowerCase();
@@ -36,9 +53,9 @@ export function AdhocList({ requests }: { requests: AdhocRequest[] }) {
       }
       return true;
     });
-  }, [requests, q, program, source]);
+  }, [requests, q, program, source, assignee]);
 
-  const anyFilter = q || program || source;
+  const anyFilter = q || program || source || assignee;
 
   return (
     <div className="space-y-3">
@@ -60,11 +77,20 @@ export function AdhocList({ requests }: { requests: AdhocRequest[] }) {
           <option value="slack">From Slack</option>
           <option value="manual">Added manually</option>
         </select>
+        {people.length > 0 && (
+          <select value={assignee} onChange={(e) => setAssignee(e.target.value)} className={selCls}>
+            <option value="">Anyone</option>
+            <option value="unassigned">Unassigned</option>
+            {people.map((p) => (
+              <option key={p.id} value={p.id}>{p.full_name ?? p.email}</option>
+            ))}
+          </select>
+        )}
         {anyFilter && (
           <button
             type="button"
             onClick={() => {
-              setQ(""); setProgram(""); setSource("");
+              setQ(""); setProgram(""); setSource(""); setAssignee("");
             }}
             className="text-xs text-accent hover:underline"
           >
@@ -83,7 +109,7 @@ export function AdhocList({ requests }: { requests: AdhocRequest[] }) {
               <th className="px-4 py-3 font-semibold">Request</th>
               <th className="px-4 py-3 font-semibold">Benefits</th>
               <th className="px-4 py-3 font-semibold">Learners</th>
-              <th className="px-4 py-3 font-semibold">Module owner</th>
+              <th className="px-4 py-3 font-semibold">Assignee</th>
               <th className="px-4 py-3 font-semibold">Stakeholder</th>
               <th className="px-4 py-3 font-semibold">Raised by</th>
               <th className="px-4 py-3 font-semibold">Date</th>
@@ -132,21 +158,45 @@ export function AdhocList({ requests }: { requests: AdhocRequest[] }) {
                 </td>
                 <td className="px-4 py-3 text-muted">{r.beneficiary ?? "—"}</td>
                 <td className="px-4 py-3 text-muted">{r.learners_impact ?? "—"}</td>
-                <td className="px-4 py-3">{r.module_owner ?? <span className="text-muted">—</span>}</td>
+                <td className="px-4 py-3">
+                  {r.assignee ? (
+                    <span className="text-sm" title={r.assignee.email}>{r.assignee.full_name ?? r.assignee.email}</span>
+                  ) : r.module_owner ? (
+                    <span className="text-sm">{r.module_owner}</span>
+                  ) : (
+                    <span className="text-xs text-muted">Unassigned</span>
+                  )}
+                </td>
                 <td className="px-4 py-3">{r.stakeholder ?? <span className="text-muted">—</span>}</td>
                 <td className="px-4 py-3 text-muted">{r.raised_by ?? "—"}</td>
                 <td className="px-4 py-3 text-muted">
                   {fmt(r.posted_at ?? r.created_at)}
-                  {r.eta && <div className="text-[11px]">ETA {fmt(r.eta)}</div>}
+                  {r.eta && (
+                    <div
+                      className={`text-[11px] ${
+                        isOverdue(r) ? "font-medium text-red-600 dark:text-red-400" : ""
+                      }`}
+                    >
+                      ETA {fmt(r.eta)}
+                      {isOverdue(r) && " · overdue"}
+                    </div>
+                  )}
                   {r.status === "Completed" && r.delivered_date && (
-                    <div className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
-                      Delivered {fmt(r.delivered_date)}
+                    <div className="mt-0.5 flex items-center gap-1.5">
+                      <span className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
+                        Delivered {fmt(r.delivered_date)}
+                      </span>
+                      {isDelayed(r) && (
+                        <span className="inline-flex items-center rounded border border-red-200 bg-red-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300">
+                          Delayed
+                        </span>
+                      )}
                     </div>
                   )}
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center justify-end gap-1">
-                    <AdhocForm request={r} />
+                    <AdhocForm request={r} people={people} />
                     <AdhocDeleteButton id={r.id} />
                   </div>
                 </td>

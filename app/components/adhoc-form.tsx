@@ -1,28 +1,48 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Pencil, Plus, X } from "lucide-react";
-import { createAdhocRequest, updateAdhocRequest } from "../(app)/actions";
+import { createAdhocRequest, updateAdhocRequest, deleteMetric } from "../(app)/actions";
 import { Loader } from "./loader";
-import { PROGRAMS, STATUSES, type AdhocRequest } from "@/lib/types";
+import { TagSelect } from "./tag-select";
+import { PROGRAMS, STATUSES, type AdhocRequest, type Profile } from "@/lib/types";
 
 const fieldCls =
   "w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-fg outline-none transition-colors focus:border-accent hover:border-border-strong";
-const labelCls = "mb-1 block text-[11px] font-semibold uppercase tracking-wide text-muted";
+const labelCls = "mb-1 block text-[12px] font-medium text-fg";
 
 export function AdhocForm({
   variant = "solid",
   request,
   triggerClassName,
+  people = [],
+  allowedPrograms = PROGRAMS as unknown as string[],
+  allMetrics = [],
+  canCreateMetrics = false,
 }: {
   variant?: "solid" | "outline";
   request?: AdhocRequest;
   triggerClassName?: string;
+  people?: Profile[];
+  allowedPrograms?: string[];
+  allMetrics?: string[];
+  canCreateMetrics?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const router = useRouter();
   const isEdit = Boolean(request);
+
+  function onDeleteMetric(name: string) {
+    if (!confirm(`Delete the metric “${name}” everywhere?\nIt will be removed from every task and adhoc request.`))
+      return;
+    startTransition(async () => {
+      await deleteMetric(name);
+      router.refresh();
+    });
+  }
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -96,18 +116,8 @@ export function AdhocForm({
               </button>
             </div>
 
-            <form onSubmit={onSubmit} className="space-y-3">
-              <div>
-                <label className={labelCls}>Title</label>
-                <input
-                  name="title"
-                  required
-                  defaultValue={request?.title ?? ""}
-                  placeholder="Short summary of the request"
-                  className={fieldCls}
-                />
-              </div>
-
+            <form onSubmit={onSubmit} className="space-y-3.5">
+              {/* App tracking — not in the Slack form, but the Board needs them. */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className={labelCls}>Status</label>
@@ -129,62 +139,101 @@ export function AdhocForm({
                 </div>
               </div>
 
+              {/* Fields mirror the Instructor-flow Slack form (order + wording). */}
+              <div>
+                <label className={labelCls}>Raised by</label>
+                <select name="raised_by" defaultValue={request?.raised_by ?? ""} className={fieldCls}>
+                  <option value="">Me</option>
+                  {people.map((p) => {
+                    const n = p.full_name ?? p.email;
+                    return <option key={p.id} value={n}>{n}</option>;
+                  })}
+                </select>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className={labelCls}>Program</label>
+                  <label className={labelCls}>For which program are we raising this?</label>
                   <select name="program" defaultValue={request?.program ?? ""} className={fieldCls}>
                     <option value="">—</option>
-                    {PROGRAMS.map((p) => (
+                    {allowedPrograms.map((p) => (
                       <option key={p} value={p}>{p}</option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className={labelCls}>Batch</label>
-                  <input name="batch" defaultValue={request?.batch ?? ""} placeholder="e.g. Academy Aug25 Beginner FE" className={fieldCls} />
+                  <label className={labelCls}>Which batch is this required for?</label>
+                  <input name="batch" defaultValue={request?.batch ?? ""} placeholder="Same name as on CCT" className={fieldCls} />
                 </div>
               </div>
 
               <div>
-                <label className={labelCls}>Module</label>
-                <input name="module" defaultValue={request?.module ?? ""} placeholder="Which module are we solving for?" className={fieldCls} />
+                <label className={labelCls}>Which module are we solving for?</label>
+                <input name="module" defaultValue={request?.module ?? ""} placeholder="Same name as in CCT" className={fieldCls} />
               </div>
 
               <div>
-                <label className={labelCls}>What problem are we solving?</label>
-                <textarea name="problem" rows={3} defaultValue={request?.problem ?? ""} placeholder="Context / scope…" className={fieldCls} />
+                <label className={labelCls}>What is the problem statement we are solving for?</label>
+                <textarea name="problem" rows={3} defaultValue={request?.problem ?? ""} placeholder="Briefly describe what you want the Instructor Team to support with." className={fieldCls} />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className={labelCls}>Who benefits</label>
-                  <input name="beneficiary" defaultValue={request?.beneficiary ?? ""} placeholder="e.g. Learners" className={fieldCls} />
+                  <label className={labelCls}>Who will benefit from this?</label>
+                  <input name="beneficiary" defaultValue={request?.beneficiary ?? ""} placeholder="Learners, Instructors, Program/CX Team…" className={fieldCls} />
                 </div>
                 <div>
-                  <label className={labelCls}>Learners impacted</label>
-                  <input name="learners_impact" defaultValue={request?.learners_impact ?? ""} placeholder="e.g. 100+" className={fieldCls} />
+                  <label className={labelCls}>How many learners will this impact?</label>
+                  <input name="learners_impact" defaultValue={request?.learners_impact ?? ""} placeholder="Approx number or %" className={fieldCls} />
                 </div>
               </div>
 
               <div>
-                <label className={labelCls}>Risk if not done</label>
-                <input name="risk_if_not_done" defaultValue={request?.risk_if_not_done ?? ""} placeholder="What happens if we skip this?" className={fieldCls} />
+                <label className={labelCls}>What might happen if this is not done?</label>
+                <input name="risk_if_not_done" defaultValue={request?.risk_if_not_done ?? ""} placeholder="Cons with quantitative pointers" className={fieldCls} />
               </div>
 
               <div>
-                <label className={labelCls}>Outcome to track</label>
-                <input name="outcome" defaultValue={request?.outcome ?? ""} placeholder="e.g. Class rating" className={fieldCls} />
+                <label className={labelCls}>How will we measure success? Mention the metrics expected to improve and how they&apos;ll be tracked.</label>
+                <textarea name="outcome" rows={2} defaultValue={request?.outcome ?? ""} placeholder="e.g. tickets down from 30 to 5 per month" className={fieldCls} />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className={labelCls}>Module owner (reviewer)</label>
-                  <input name="module_owner" defaultValue={request?.module_owner ?? ""} placeholder="Name" className={fieldCls} />
+                  <label className={labelCls}>Who should review this? (assignee)</label>
+                  <select name="assignee_id" defaultValue={request?.assignee_id ?? ""} className={fieldCls}>
+                    <option value="">Unassigned</option>
+                    {people.map((p) => (
+                      <option key={p.id} value={p.id}>{p.full_name ?? p.email}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
-                  <label className={labelCls}>Stakeholder</label>
-                  <input name="stakeholder" defaultValue={request?.stakeholder ?? ""} placeholder="Name" className={fieldCls} />
+                  <label className={labelCls}>Tag the stakeholder for this request</label>
+                  <select name="stakeholder" defaultValue={request?.stakeholder ?? ""} className={fieldCls}>
+                    <option value="">—</option>
+                    {people.map((p) => {
+                      const n = p.full_name ?? p.email;
+                      return <option key={p.id} value={n}>{n}</option>;
+                    })}
+                  </select>
                 </div>
+              </div>
+
+              <div>
+                <label className={labelCls}>
+                  Metrics{!canCreateMetrics && <span className="ml-1 text-muted">(select from list)</span>}
+                </label>
+                <TagSelect
+                  suggestions={allMetrics}
+                  defaultTags={request?.metrics ?? []}
+                  fieldName="metrics"
+                  placeholder={canCreateMetrics ? "Select or add metrics…" : "Select metrics…"}
+                  prefix=""
+                  allowCreate={canCreateMetrics}
+                  onDelete={canCreateMetrics ? onDeleteMetric : undefined}
+                  chipClass="bg-cyan-100 text-cyan-700 dark:bg-cyan-950 dark:text-cyan-300 hover:bg-cyan-200/60 dark:hover:bg-cyan-900"
+                />
               </div>
 
               <div>

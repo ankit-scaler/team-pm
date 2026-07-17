@@ -130,8 +130,13 @@ export function parseAdhocMessage(text: string): AdhocFields {
   };
 
   for (let i = 0; i < hits.length; i++) {
-    const start = hits[i].idx + hits[i].len;
+    const labelEnd = hits[i].idx + hits[i].len;
     const end = i + 1 < hits.length ? hits[i + 1].idx : body.length;
+    // The answer sits on the line(s) AFTER the question. Skip to the end of the
+    // question line so a short-alias match (which is a prefix of the full
+    // question) doesn't leak the rest of the question into the answer.
+    const nl = body.indexOf("\n", labelEnd);
+    const start = nl >= 0 && nl < end ? nl + 1 : labelEnd;
     fields[hits[i].key] = tidyAnswer(body.slice(start, end));
   }
 

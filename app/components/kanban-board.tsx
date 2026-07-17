@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, MessageSquare, FileSpreadsheet } from "lucide-react";
+import { ChevronLeft, ChevronRight, MessageSquare, FileSpreadsheet, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { changeStatus, changeAdhocStatus } from "../(app)/actions";
 import { TaskForm } from "./task-form";
@@ -21,10 +21,25 @@ import {
 function isDelayed(t: Task) {
   return t.status === "Completed" && t.eta && t.delivered_date && t.delivered_date > t.eta;
 }
+function isAdhocOverdue(a: AdhocRequest) {
+  return (
+    !!a.eta &&
+    a.status !== "Completed" &&
+    new Date(a.eta + "T00:00:00") < new Date(new Date().toDateString())
+  );
+}
+function isAdhocDelayed(a: AdhocRequest) {
+  return a.status === "Completed" && !!a.eta && !!a.delivered_date && a.delivered_date > a.eta;
+}
 
 function fmt(d: string | null) {
   if (!d) return null;
   return new Date(d + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+// "2026-07" → "Jul 2026"
+function fmtMonth(ym: string) {
+  const [y, m] = ym.split("-").map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: "short", year: "numeric" });
 }
 
 export function KanbanBoard({
@@ -41,10 +56,17 @@ export function KanbanBoard({
   allMetrics?: string[];
 }) {
   const router = useRouter();
-  const [, startTransition] = useTransition();
+  const [isPending, startTransition] = useTransition();
+  const [movingId, setMovingId] = useState<string | null>(null);
   const [assignee, setAssignee] = useState("");
   const [tag, setTag] = useState("");
+  const [month, setMonth] = useState(""); // YYYY-MM, matched against ETA
   const [q, setQ] = useState("");
+
+  // Clear the per-card spinner once the move's server action settles.
+  useEffect(() => {
+    if (!isPending) setMovingId(null);
+  }, [isPending]);
 
   // Live-refresh when anyone changes a task.
   useEffect(() => {
@@ -65,19 +87,22 @@ export function KanbanBoard({
       if (assignee === "unassigned" ? t.assignee_id : assignee && t.assignee_id !== assignee)
         return false;
       if (tag && !t.tags.includes(tag)) return false;
+      if (month && (!t.eta || !t.eta.startsWith(month))) return false;
       if (q && !t.title.toLowerCase().includes(q.toLowerCase())) return false;
       return true;
     });
-  }, [tasks, assignee, tag, q]);
+  }, [tasks, assignee, tag, month, q]);
 
   // Adhoc requests appear on the board too, in their status column. They have no
-  // assignee/tags, so the person/tag filters simply hide them.
+  // tags, so the tag filter hides them; the person filter matches their assignee.
   const visibleAdhoc = useMemo(() => {
     if (tag) return [];
-    if (assignee && assignee !== "unassigned") return [];
     return adhocRequests.filter((a) => {
+      if (assignee === "unassigned" ? a.assignee_id : assignee && a.assignee_id !== assignee)
+        return false;
+      if (month && (!a.eta || !a.eta.startsWith(month))) return false;
       if (q) {
-        const hay = [a.title, a.module, a.program, a.raised_by]
+        const hay = [a.title, a.module, a.program, a.raised_by, a.assignee?.full_name, a.assignee?.email]
           .filter(Boolean)
           .join(" ")
           .toLowerCase();
@@ -85,14 +110,23 @@ export function KanbanBoard({
       }
       return true;
     });
-  }, [adhocRequests, assignee, tag, q]);
+  }, [adhocRequests, assignee, tag, month, q]);
 
-  const anyFilter = assignee || tag || q;
+  const anyFilter = assignee || tag || month || q;
+
+  // Distinct ETA months across tasks + adhoc, newest first.
+  const monthOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const t of tasks) if (t.eta) set.add(t.eta.slice(0, 7));
+    for (const a of adhocRequests) if (a.eta) set.add(a.eta.slice(0, 7));
+    return Array.from(set).sort().reverse();
+  }, [tasks, adhocRequests]);
 
   function move(task: Task, dir: -1 | 1) {
     const idx = STATUSES.indexOf(task.status);
     const next = STATUSES[idx + dir];
     if (!next) return;
+    setMovingId(task.id);
     startTransition(() => changeStatus(task.id, next as Status));
   }
 
@@ -100,6 +134,7 @@ export function KanbanBoard({
     const idx = STATUSES.indexOf(a.status);
     const next = STATUSES[idx + dir];
     if (!next) return;
+    setMovingId(a.id);
     startTransition(() => changeAdhocStatus(a.id, next as Status));
   }
 
@@ -123,6 +158,17 @@ export function KanbanBoard({
             ))}
           </select>
         )}
+        <select
+          value={month}
+          onChange={(e) => setMonth(e.target.value)}
+          title="Filter by ETA month"
+          className={selCls}
+        >
+          <option value="">Any month</option>
+          {monthOptions.map((m) => (
+            <option key={m} value={m}>{fmtMonth(m)}</option>
+          ))}
+        </select>
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
@@ -135,6 +181,7 @@ export function KanbanBoard({
             onClick={() => {
               setAssignee("");
               setTag("");
+              setMonth("");
               setQ("");
             }}
             className="text-xs text-accent hover:underline"
@@ -166,14 +213,23 @@ export function KanbanBoard({
                     key={a.id}
                     a={a}
                     col={col}
+                    people={people}
                     onMove={moveAdhoc}
+                    moving={isPending && movingId === a.id}
                   />
                 ))}
-                {items.map((t) => (
+                {items.map((t) => {
+                  const moving = isPending && movingId === t.id;
+                  return (
                   <article
                     key={t.id}
-                    className={`group rounded-lg border border-l-[3px] border-border ${STAGE_ACCENT[col]} bg-surface p-3.5 shadow-sm transition-shadow hover:shadow-md`}
+                    className={`group relative rounded-lg border border-l-[3px] border-border ${STAGE_ACCENT[col]} bg-surface p-3.5 shadow-sm transition-shadow hover:shadow-md`}
                   >
+                    {moving && (
+                      <div className="absolute inset-0 z-10 grid place-items-center rounded-lg bg-surface/60 backdrop-blur-[1px]">
+                        <Loader2 size={18} className="animate-spin text-accent" />
+                      </div>
+                    )}
                     {/* Title + action */}
                     <div className="flex items-start justify-between gap-2">
                       <h3 className="text-[13px] font-semibold leading-snug text-fg">
@@ -279,7 +335,7 @@ export function KanbanBoard({
                         <button
                           type="button"
                           onClick={() => move(t, -1)}
-                          disabled={STATUSES.indexOf(t.status) === 0}
+                          disabled={moving || STATUSES.indexOf(t.status) === 0}
                           className="grid h-6 w-6 place-items-center rounded text-muted hover:bg-surface-2 hover:text-fg disabled:opacity-25"
                           aria-label="Move back"
                         >
@@ -288,7 +344,7 @@ export function KanbanBoard({
                         <button
                           type="button"
                           onClick={() => move(t, 1)}
-                          disabled={STATUSES.indexOf(t.status) === STATUSES.length - 1}
+                          disabled={moving || STATUSES.indexOf(t.status) === STATUSES.length - 1}
                           className="grid h-6 w-6 place-items-center rounded text-muted hover:bg-surface-2 hover:text-fg disabled:opacity-25"
                           aria-label="Move forward"
                         >
@@ -298,7 +354,8 @@ export function KanbanBoard({
                       </div>
                     </div>
                   </article>
-                ))}
+                  );
+                })}
               </div>
             </section>
           );
@@ -312,17 +369,26 @@ export function KanbanBoard({
 function AdhocCard({
   a,
   col,
+  people,
   onMove,
+  moving = false,
 }: {
   a: AdhocRequest;
   col: Status;
+  people: Profile[];
   onMove: (a: AdhocRequest, dir: -1 | 1) => void;
+  moving?: boolean;
 }) {
   const title = a.title || a.module || a.program || "Adhoc request";
   return (
     <article
-      className={`group rounded-lg border border-l-[3px] border-border ${STAGE_ACCENT[col]} bg-surface p-3.5 shadow-sm transition-shadow hover:shadow-md`}
+      className={`group relative rounded-lg border border-l-[3px] border-border ${STAGE_ACCENT[col]} bg-surface p-3.5 shadow-sm transition-shadow hover:shadow-md`}
     >
+      {moving && (
+        <div className="absolute inset-0 z-10 grid place-items-center rounded-lg bg-surface/60 backdrop-blur-[1px]">
+          <Loader2 size={18} className="animate-spin text-accent" />
+        </div>
+      )}
       <div className="flex items-start justify-between gap-2">
         <h3 className="text-[13px] font-semibold leading-snug text-fg">{title}</h3>
         <div className="flex shrink-0 items-center gap-1">
@@ -332,6 +398,7 @@ function AdhocCard({
           <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
             <AdhocForm
               request={a}
+              people={people}
               triggerClassName="grid h-6 w-6 place-items-center rounded text-muted transition-colors hover:bg-surface-2 hover:text-fg"
             />
             <AdhocDeleteButton
@@ -348,7 +415,16 @@ function AdhocCard({
             Incomplete
           </span>
         )}
-        {a.eta && <span className="font-medium">ETA {fmt(a.eta)}</span>}
+        {a.eta && (
+          <span className={`font-medium ${isAdhocOverdue(a) ? "text-red-600 dark:text-red-400" : ""}`}>
+            ETA {fmt(a.eta)}
+          </span>
+        )}
+        {isAdhocOverdue(a) && (
+          <span className="inline-flex items-center rounded border border-red-200 bg-red-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300">
+            Overdue
+          </span>
+        )}
         {a.status === "Completed" && a.delivered_date && (
           <>
             {a.eta && <span aria-hidden className="text-muted-2">·</span>}
@@ -356,6 +432,11 @@ function AdhocCard({
               Delivered {fmt(a.delivered_date)}
             </span>
           </>
+        )}
+        {isAdhocDelayed(a) && (
+          <span className="inline-flex items-center rounded border border-red-200 bg-red-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300">
+            Delayed
+          </span>
         )}
         {a.learners_impact && (
           <>
@@ -385,21 +466,26 @@ function AdhocCard({
         </div>
       )}
 
-      <div className="mt-3 flex items-center justify-between border-t border-border pt-2.5">
-        <span className="truncate text-xs text-muted">
-          {a.raised_by ? (
-            <>
-              Raised by <span className="font-medium text-fg/70">{a.raised_by}</span>
-            </>
-          ) : (
-            "Adhoc request"
-          )}
+      <div className="mt-3 flex flex-col gap-1.5 border-t border-border pt-2.5">
+        {a.raised_by && (
+          <span className="text-[11px] text-muted">
+            Raised by <span className="font-medium text-fg/70">{a.raised_by}</span>
+          </span>
+        )}
+        <div className="flex items-center justify-between">
+        <span className="flex items-center gap-1.5 truncate text-xs">
+          <span className="grid h-5 w-5 flex-shrink-0 place-items-center rounded-full bg-accent-soft text-[10px] font-semibold text-accent">
+            {a.assignee ? (a.assignee.full_name ?? a.assignee.email)[0]?.toUpperCase() : "?"}
+          </span>
+          <span className="truncate font-medium text-fg/80">
+            {a.assignee ? (a.assignee.full_name ?? a.assignee.email) : "Unassigned"}
+          </span>
         </span>
         <div className="flex items-center gap-0.5">
           <button
             type="button"
             onClick={() => onMove(a, -1)}
-            disabled={STATUSES.indexOf(a.status) === 0}
+            disabled={moving || STATUSES.indexOf(a.status) === 0}
             className="grid h-6 w-6 place-items-center rounded text-muted hover:bg-surface-2 hover:text-fg disabled:opacity-25"
             aria-label="Move back"
           >
@@ -408,12 +494,13 @@ function AdhocCard({
           <button
             type="button"
             onClick={() => onMove(a, 1)}
-            disabled={STATUSES.indexOf(a.status) === STATUSES.length - 1}
+            disabled={moving || STATUSES.indexOf(a.status) === STATUSES.length - 1}
             className="grid h-6 w-6 place-items-center rounded text-muted hover:bg-surface-2 hover:text-fg disabled:opacity-25"
             aria-label="Move forward"
           >
             <ChevronRight size={14} />
           </button>
+        </div>
         </div>
       </div>
     </article>

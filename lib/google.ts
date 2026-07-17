@@ -178,7 +178,14 @@ export async function syncTaskCalendarEvent(args: SyncArgs): Promise<string | nu
         { method: "PATCH", headers: authHeaders, body: JSON.stringify(body) }
       );
       if (res.ok) return args.existingEventId;
-      // Event may have been deleted on Google's side — fall through to create.
+      // Only re-create if the event is genuinely gone. On a transient error
+      // (429/500/403) keep the existing id — otherwise we'd orphan the old event
+      // and create a duplicate that double-books attendees.
+      if (res.status !== 404 && res.status !== 410) {
+        console.error("Google Calendar update failed:", res.status, await res.text());
+        return args.existingEventId;
+      }
+      // 404/410 → event was deleted on Google's side; fall through to create.
     }
 
     const res = await fetch(`${CAL_BASE}?sendUpdates=all`, {

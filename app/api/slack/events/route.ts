@@ -13,8 +13,9 @@ function verifySignature(raw: string, ts: string | null, sig: string | null): bo
   const secret = process.env.SLACK_SIGNING_SECRET;
   if (!secret) return false;
   if (!ts || !sig) return false;
-  // Reject stale requests (>5 min) to prevent replay.
-  if (Math.abs(Date.now() / 1000 - Number(ts)) > 60 * 5) return false;
+  const tsNum = Number(ts);
+  // Reject non-numeric or stale (>5 min) timestamps to prevent replay.
+  if (!Number.isFinite(tsNum) || Math.abs(Date.now() / 1000 - tsNum) > 60 * 5) return false;
   const base = `v0:${ts}:${raw}`;
   const expected = "v0=" + crypto.createHmac("sha256", secret).update(base).digest("hex");
   try {
@@ -37,12 +38,16 @@ const userNameCache = new Map<string, string>();
 async function resolveMentions(text: string): Promise<string> {
   const ids = Array.from(text.matchAll(/<@([A-Z0-9]+)(?:\|[^>]+)?>/g)).map((m) => m[1]);
   const unique = Array.from(new Set(ids));
-  for (const id of unique) {
-    if (userNameCache.has(id)) continue;
-    const r = await slackApi("users.info", { user: id });
-    const p = r?.user?.profile ?? {};
-    userNameCache.set(id, r?.user?.real_name ?? p.display_name ?? p.real_name ?? id);
-  }
+  // Resolve in parallel to stay well under Slack's ~3s ack deadline.
+  await Promise.all(
+    unique
+      .filter((id) => !userNameCache.has(id))
+      .map(async (id) => {
+        const r = await slackApi("users.info", { user: id });
+        const p = r?.user?.profile ?? {};
+        userNameCache.set(id, r?.user?.real_name ?? p.display_name ?? p.real_name ?? id);
+      })
+  );
   return text.replace(/<@([A-Z0-9]+)(?:\|[^>]+)?>/g, (_m, id) => `@${userNameCache.get(id) ?? id}`);
 }
 
@@ -71,12 +76,37 @@ export async function POST(request: Request) {
     try {
       await handleEvent(payload.event);
     } catch (e) {
+      // Return non-2xx so Slack redelivers; storage is idempotent (unique
+      // slack_ts), so a retry can't create duplicates.
       console.error("slack events handler error:", e);
+      return NextResponse.json({ ok: false }, { status: 500 });
     }
   }
 
-  // Always 200 fast; work is idempotent (dedup on slack_ts) so retries are safe.
   return NextResponse.json({ ok: true });
+}
+
+// Fuzzy-match a name (e.g. the parsed Module Owner) to a team profile id, so a
+// Slack-fed adhoc gets a real assignee. Returns null if no confident match.
+async function profileIdForName(admin: any, name: string | null): Promise<string | null> {
+  if (!name) return null;
+  const { data } = await admin.from("profiles").select("id, full_name, email");
+  const profiles = (data ?? []) as { id: string; full_name: string | null; email: string }[];
+  const norm = (s: string) =>
+    s.toLowerCase().replace(/\(.*?\)/g, " ").replace(/[^a-z\s]/g, " ").replace(/\s+/g, " ").trim();
+  const target = norm(name);
+  if (!target) return null;
+  const tt = target.split(" ").filter(Boolean);
+  let best: { id: string; score: number } | null = null;
+  for (const p of profiles) {
+    const cand = norm(p.full_name ?? p.email.split("@")[0]);
+    if (!cand) continue;
+    const ct = new Set(cand.split(" ").filter(Boolean));
+    let s = cand === target ? 1 : tt.filter((t) => ct.has(t)).length / Math.max(tt.length, 1);
+    if (cand.includes(target) || target.includes(cand)) s = Math.max(s, 0.85);
+    if (!best || s > best.score) best = { id: p.id, score: s };
+  }
+  return best && best.score >= 0.5 ? best.id : null;
 }
 
 async function handleEvent(event: any) {
@@ -113,6 +143,8 @@ async function handleEvent(event: any) {
   }
 
   const posted_at = event.ts ? new Date(Number(event.ts) * 1000).toISOString() : null;
+  // Assignee = the Module Owner, matched to a team profile.
+  const assignee_id = await profileIdForName(admin, fields.module_owner);
 
   await admin.from("adhoc_requests").upsert(
     {
@@ -120,6 +152,7 @@ async function handleEvent(event: any) {
       slack_channel: event.channel,
       permalink,
       posted_at,
+      assignee_id,
       raw: fields as any,
       ...fields,
     },

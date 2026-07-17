@@ -5,7 +5,62 @@ import { headers } from "next/headers";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { notifyStatusChange } from "@/lib/slack";
 import { syncTaskCalendarEvent, deleteTaskCalendarEvent } from "@/lib/google";
-import type { Status } from "@/lib/types";
+import { getMyAccess } from "@/lib/access";
+import type { MembershipRole } from "@/lib/access";
+import { type Status } from "@/lib/types";
+import { getMetricNames } from "@/lib/queries";
+
+// Only admins may create NEW metrics. For non-admins, drop any submitted metric
+// that isn't already a known one (the default seed list or one already in use).
+async function sanitizeMetrics(submitted: string[]): Promise<string[]> {
+  if (submitted.length === 0) return submitted;
+  const access = await getMyAccess();
+
+  // Known metrics = the registry table.
+  const known = await getMetricNames();
+  const knownLower = new Set(known.map((m) => m.toLowerCase()));
+
+  if (access.isAdmin) {
+    // Admins may introduce new metrics — register any that aren't in the table
+    // yet so they show up in every picker from now on.
+    const fresh = submitted.filter((m) => m.trim() && !knownLower.has(m.trim().toLowerCase()));
+    if (fresh.length) {
+      const admin = createAdminClient();
+      await admin
+        .from("metrics")
+        .upsert(fresh.map((name) => ({ name: name.trim() })), { onConflict: "name" });
+    }
+    return submitted;
+  }
+
+  // Non-admins may only use metrics that already exist in the registry.
+  return submitted.filter((m) => knownLower.has(m.trim().toLowerCase()));
+}
+
+// Delete a metric globally (admin only): drops it from the registry and strips
+// it off every task/adhoc that carries it. Runs via the security-definer RPC.
+export async function deleteMetric(name: string) {
+  await requireAdmin();
+  const clean = name.trim();
+  if (!clean) return;
+  const admin = createAdminClient();
+  const { error } = await admin.rpc("delete_metric", { p_metric: clean });
+  if (error) throw new Error(error.message);
+  revalidatePath("/board");
+  revalidatePath("/tasks");
+  revalidatePath("/adhoc");
+  revalidatePath("/summary");
+  revalidatePath("/program-track");
+}
+
+// RBAC guard: a non-admin may only act within programs they belong to.
+async function assertProgramAllowed(program: string | null) {
+  const access = await getMyAccess();
+  if (access.isAdmin) return;
+  if (!program || !access.visiblePrograms.includes(program)) {
+    throw new Error("You don't have access to that program.");
+  }
+}
 
 function appUrl(): string {
   const h = headers();
@@ -90,6 +145,15 @@ async function emailsForNames(names: string[]): Promise<string[]> {
   return Array.from(out);
 }
 
+// Display name for a profile id (used to keep adhoc.module_owner text in sync
+// with the chosen assignee).
+async function nameForProfile(id: string | null): Promise<string | null> {
+  if (!id) return null;
+  const supabase = createClient();
+  const { data } = await supabase.from("profiles").select("full_name, email").eq("id", id).single();
+  return data?.full_name ?? data?.email ?? null;
+}
+
 async function syncStakeholders(taskId: string, ids: string[]) {
   const supabase = createClient();
   await supabase.from("task_stakeholders").delete().eq("task_id", taskId);
@@ -104,8 +168,11 @@ export async function createTask(formData: FormData) {
   const supabase = createClient();
   const me = await currentProfile();
 
+  await assertProgramAllowed(str(formData.get("program")));
+
   const status = (str(formData.get("status")) ?? "To pick") as Status;
   const stakeholderIds = formData.getAll("stakeholders").map(String).filter(Boolean);
+  const metrics = await sanitizeMetrics(parseMultiValue(formData, "metrics"));
 
   const { data: task, error } = await supabase
     .from("tasks")
@@ -119,7 +186,7 @@ export async function createTask(formData: FormData) {
       assignee_id: str(formData.get("assignee_id")),
       delivered_date: str(formData.get("delivered_date")),
       tags: parseMultiValue(formData, "tags"),
-      metrics: parseMultiValue(formData, "metrics"),
+      metrics,
       slack_link: str(formData.get("slack_link")),
       sheet_link: str(formData.get("sheet_link")),
       program: str(formData.get("program")),
@@ -183,12 +250,17 @@ export async function updateTask(taskId: string, formData: FormData) {
 
   const { data: before } = await supabase
     .from("tasks")
-    .select("status, title, created_by, calendar_event_id")
+    .select("status, title, created_by, calendar_event_id, program")
     .eq("id", taskId)
     .single();
 
+  await assertProgramAllowed(before?.program ?? null);
+  // Also block moving the task INTO a program the caller isn't in.
+  await assertProgramAllowed(str(formData.get("program")));
+
   const newStatus = (str(formData.get("status")) ?? "To pick") as Status;
   const stakeholderIds = formData.getAll("stakeholders").map(String).filter(Boolean);
+  const metrics = await sanitizeMetrics(parseMultiValue(formData, "metrics"));
 
   const { error } = await supabase
     .from("tasks")
@@ -202,7 +274,7 @@ export async function updateTask(taskId: string, formData: FormData) {
       assignee_id: str(formData.get("assignee_id")),
       delivered_date: str(formData.get("delivered_date")),
       tags: parseMultiValue(formData, "tags"),
-      metrics: parseMultiValue(formData, "metrics"),
+      metrics,
       slack_link: str(formData.get("slack_link")),
       sheet_link: str(formData.get("sheet_link")),
       program: str(formData.get("program")),
@@ -260,11 +332,12 @@ export async function changeStatus(taskId: string, newStatus: Status) {
 
   const { data: before } = await supabase
     .from("tasks")
-    .select("status, title, assignee_id, created_by, calendar_event_id")
+    .select("status, title, assignee_id, created_by, calendar_event_id, program")
     .eq("id", taskId)
     .single();
 
   if (!before) throw new Error("Task not found");
+  await assertProgramAllowed(before.program ?? null);
 
   const update: { status: Status; assignee_id?: string } = { status: newStatus };
   // When someone starts working and nobody owns it yet, they pick it up.
@@ -299,9 +372,11 @@ export async function deleteTask(taskId: string) {
   const supabase = createClient();
   const { data: before } = await supabase
     .from("tasks")
-    .select("created_by, calendar_event_id")
+    .select("created_by, calendar_event_id, program")
     .eq("id", taskId)
     .single();
+
+  await assertProgramAllowed(before?.program ?? null);
 
   const { error } = await supabase.from("tasks").delete().eq("id", taskId);
   if (error) throw new Error(error.message);
@@ -322,9 +397,13 @@ export async function createAdhocRequest(formData: FormData) {
   const supabase = createClient();
   const me = await currentProfile();
 
+  await assertProgramAllowed(str(formData.get("program")));
+
   const eta = str(formData.get("eta"));
-  const moduleOwner = str(formData.get("module_owner"));
+  const assigneeId = str(formData.get("assignee_id"));
+  const moduleOwner = await nameForProfile(assigneeId); // keep text in sync with assignee
   const stakeholder = str(formData.get("stakeholder"));
+  const metrics = await sanitizeMetrics(parseMultiValue(formData, "metrics"));
 
   const { data: created, error } = await supabase
     .from("adhoc_requests")
@@ -332,6 +411,8 @@ export async function createAdhocRequest(formData: FormData) {
       source: "manual",
       status: (str(formData.get("status")) ?? "To pick") as Status,
       eta,
+      metrics,
+      assignee_id: assigneeId,
       permalink: str(formData.get("slack_link")),
       title: str(formData.get("title")),
       raised_by: str(formData.get("raised_by")) ?? me.name,
@@ -380,15 +461,21 @@ export async function updateAdhocRequest(id: string, formData: FormData) {
 
   const { data: before } = await supabase
     .from("adhoc_requests")
-    .select("created_by, calendar_event_id")
+    .select("created_by, calendar_event_id, program")
     .eq("id", id)
     .single();
+
+  await assertProgramAllowed(before?.program ?? null);
+  // Also block relabelling the request INTO a program the caller isn't in.
+  await assertProgramAllowed(str(formData.get("program")));
 
   const status = (str(formData.get("status")) ?? "To pick") as Status;
   const eta = str(formData.get("eta"));
   const title = str(formData.get("title"));
-  const moduleOwner = str(formData.get("module_owner"));
+  const assigneeId = str(formData.get("assignee_id"));
+  const moduleOwner = await nameForProfile(assigneeId);
   const stakeholder = str(formData.get("stakeholder"));
+  const metrics = await sanitizeMetrics(parseMultiValue(formData, "metrics"));
 
   const { error } = await supabase
     .from("adhoc_requests")
@@ -396,6 +483,8 @@ export async function updateAdhocRequest(id: string, formData: FormData) {
       status,
       eta,
       title,
+      metrics,
+      assignee_id: assigneeId,
       permalink: str(formData.get("slack_link")),
       program: str(formData.get("program")),
       batch: str(formData.get("batch")),
@@ -444,9 +533,11 @@ export async function changeAdhocStatus(id: string, newStatus: Status) {
 
   const { data: before } = await supabase
     .from("adhoc_requests")
-    .select("created_by, calendar_event_id")
+    .select("created_by, calendar_event_id, program")
     .eq("id", id)
     .single();
+
+  await assertProgramAllowed(before?.program ?? null);
 
   const { error } = await supabase
     .from("adhoc_requests")
@@ -470,9 +561,11 @@ export async function deleteAdhocRequest(id: string) {
   await currentProfile();
   const { data: before } = await supabase
     .from("adhoc_requests")
-    .select("created_by, calendar_event_id")
+    .select("created_by, calendar_event_id, program")
     .eq("id", id)
     .single();
+
+  await assertProgramAllowed(before?.program ?? null);
 
   const { error } = await supabase.from("adhoc_requests").delete().eq("id", id);
   if (error) throw new Error(error.message);
@@ -501,6 +594,52 @@ async function requireAdmin() {
     .single();
   if (data?.role !== "admin") throw new Error("Admins only");
   return user.id;
+}
+
+// Assign / update a program membership. Admins can set any role for any program;
+// MOs can only add Users to programs they own.
+export async function setMembership(profileId: string, program: string, role: MembershipRole) {
+  const access = await getMyAccess();
+  const canManage = access.isAdmin || (role === "user" && access.moPrograms.includes(program));
+  if (!canManage) throw new Error("Not allowed");
+
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("program_memberships")
+    .upsert({ profile_id: profileId, program, role }, { onConflict: "profile_id,program" });
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/admin");
+  revalidatePath("/board");
+  revalidatePath("/tasks");
+  revalidatePath("/adhoc");
+}
+
+// Remove a program membership. Admins can remove any; MOs only 'user' rows in their programs.
+export async function removeMembership(profileId: string, program: string) {
+  const access = await getMyAccess();
+  const admin = createAdminClient();
+
+  if (!access.isAdmin) {
+    if (!access.moPrograms.includes(program)) throw new Error("Not allowed");
+    const { data } = await admin
+      .from("program_memberships")
+      .select("role")
+      .eq("profile_id", profileId)
+      .eq("program", program)
+      .single();
+    if (data?.role !== "user") throw new Error("Not allowed");
+  }
+
+  const { error } = await admin
+    .from("program_memberships")
+    .delete()
+    .eq("profile_id", profileId)
+    .eq("program", program);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/admin");
+  revalidatePath("/board");
 }
 
 export async function deleteUser(userId: string) {

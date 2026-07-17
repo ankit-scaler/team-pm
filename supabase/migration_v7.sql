@@ -58,7 +58,9 @@ create index if not exists adhoc_requests_created_idx
 
 alter table public.adhoc_requests enable row level security;
 
+drop policy if exists "adhoc readable by authenticated" on public.adhoc_requests;
 create policy "adhoc readable by authenticated"
   on public.adhoc_requests for select to authenticated using (true);
+drop policy if exists "adhoc insertable by authenticated" on public.adhoc_requests;
 create policy "adhoc insertable by authenticated"
   on public.adhoc_requests for insert to authenticated with check (true);

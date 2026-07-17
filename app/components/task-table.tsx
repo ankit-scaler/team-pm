@@ -19,6 +19,11 @@ function isOverdue(t: Task) {
 function isDelayed(t: Task) {
   return t.status === "Completed" && t.eta && t.delivered_date && t.delivered_date > t.eta;
 }
+// "2026-07" → "Jul 2026"
+function fmtMonth(ym: string) {
+  const [y, m] = ym.split("-").map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: "short", year: "numeric" });
+}
 const openCalendar = (e: React.MouseEvent<HTMLInputElement>) =>
   (e.currentTarget as any).showPicker?.();
 
@@ -43,6 +48,7 @@ export function TaskTable({
   const [metric, setMetric] = useState("");
   const [program, setProgram] = useState("");
   const [track, setTrack] = useState("");
+  const [month, setMonth] = useState(""); // YYYY-MM, matched against ETA
   const [etaFrom, setEtaFrom] = useState("");
   const [etaTo, setEtaTo] = useState("");
 
@@ -56,14 +62,22 @@ export function TaskTable({
       if (metric && !t.metrics.includes(metric)) return false;
       if (program && t.program !== program) return false;
       if (track && t.track !== track) return false;
+      if (month && (!t.eta || !t.eta.startsWith(month))) return false;
       if (etaFrom && (!t.eta || t.eta < etaFrom)) return false;
       if (etaTo && (!t.eta || t.eta > etaTo)) return false;
       if (q && !t.title.toLowerCase().includes(q.toLowerCase())) return false;
       return true;
     });
-  }, [tasks, q, status, assignee, priority, tag, metric, program, track, etaFrom, etaTo]);
+  }, [tasks, q, status, assignee, priority, tag, metric, program, track, month, etaFrom, etaTo]);
 
-  const anyFilter = q || status || assignee || priority || tag || metric || program || track || etaFrom || etaTo;
+  const anyFilter = q || status || assignee || priority || tag || metric || program || track || month || etaFrom || etaTo;
+
+  // Distinct ETA months present, newest first — powers the Month dropdown.
+  const monthOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const t of tasks) if (t.eta) set.add(t.eta.slice(0, 7));
+    return Array.from(set).sort().reverse();
+  }, [tasks]);
 
   return (
     <div className="space-y-3">
@@ -124,7 +138,14 @@ export function TaskTable({
       </div>
 
       <div className="flex flex-wrap items-center gap-2 text-sm">
-        <span className="text-muted">ETA between</span>
+        <span className="text-muted">Month</span>
+        <select value={month} onChange={(e) => setMonth(e.target.value)} title="Filter by ETA month" className={selCls}>
+          <option value="">Any month</option>
+          {monthOptions.map((m) => (
+            <option key={m} value={m}>{fmtMonth(m)}</option>
+          ))}
+        </select>
+        <span className="ml-1 text-muted">ETA between</span>
         <input type="date" value={etaFrom} onChange={(e) => setEtaFrom(e.target.value)} onClick={openCalendar} className={`${selCls} cursor-pointer`} />
         <span className="text-muted">and</span>
         <input type="date" value={etaTo} onChange={(e) => setEtaTo(e.target.value)} onClick={openCalendar} className={`${selCls} cursor-pointer`} />
@@ -132,7 +153,7 @@ export function TaskTable({
           <button
             type="button"
             onClick={() => {
-              setQ(""); setStatus(""); setAssignee(""); setPriority(""); setTag(""); setMetric(""); setProgram(""); setTrack(""); setEtaFrom(""); setEtaTo("");
+              setQ(""); setStatus(""); setAssignee(""); setPriority(""); setTag(""); setMetric(""); setProgram(""); setTrack(""); setMonth(""); setEtaFrom(""); setEtaTo("");
             }}
             className="text-xs text-accent hover:underline"
           >
