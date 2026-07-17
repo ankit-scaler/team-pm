@@ -21,7 +21,7 @@ export function InsightsView({ tasks }: { tasks: Task[] }) {
 
   const today = useMemo(() => new Date(new Date().toDateString()), []);
   const isOverdue = (t: Task) =>
-    !!t.eta && t.status !== "Completed" && new Date(t.eta) < today;
+    !!t.eta && t.status !== "Completed" && new Date(t.eta + "T00:00:00") < today;
 
   const filtered = useMemo(
     () => (program ? tasks.filter((t) => t.program === program) : tasks),
@@ -40,8 +40,11 @@ export function InsightsView({ tasks }: { tasks: Task[] }) {
       if (t.status === "Completed") {
         s.completed++;
         if (t.picked_date && t.delivered_date) {
-          const days =
-            (new Date(t.delivered_date).getTime() - new Date(t.picked_date).getTime()) / 86_400_000;
+          // Compare whole days (picked_date is a timestamp, delivered_date a date)
+          // so same-day completions count as 0 instead of being dropped as negative.
+          const picked = new Date(t.picked_date.slice(0, 10) + "T00:00:00").getTime();
+          const delivered = new Date(t.delivered_date + "T00:00:00").getTime();
+          const days = Math.round((delivered - picked) / 86_400_000);
           if (days >= 0) {
             s.totalDays += days;
             s.doneWithDays++;

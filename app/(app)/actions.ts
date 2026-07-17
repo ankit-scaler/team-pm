@@ -201,6 +201,8 @@ export async function updateTask(taskId: string, formData: FormData) {
     .single();
 
   await assertProgramAllowed(before?.program ?? null);
+  // Also block moving the task INTO a program the caller isn't in.
+  await assertProgramAllowed(str(formData.get("program")));
 
   const newStatus = (str(formData.get("status")) ?? "To pick") as Status;
   const stakeholderIds = formData.getAll("stakeholders").map(String).filter(Boolean);
@@ -405,6 +407,8 @@ export async function updateAdhocRequest(id: string, formData: FormData) {
     .single();
 
   await assertProgramAllowed(before?.program ?? null);
+  // Also block relabelling the request INTO a program the caller isn't in.
+  await assertProgramAllowed(str(formData.get("program")));
 
   const status = (str(formData.get("status")) ?? "To pick") as Status;
   const eta = str(formData.get("eta"));
