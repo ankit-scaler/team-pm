@@ -50,7 +50,7 @@ export function Nav({
             <span className="text-base font-extrabold tracking-tight text-accent">Scaler</span>
           )}
           <span className="hidden text-sm font-semibold tracking-tight text-muted sm:inline">
-            · Team PM
+            .
           </span>
         </Link>
 
