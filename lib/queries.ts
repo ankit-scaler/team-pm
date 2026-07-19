@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getMyAccess } from "@/lib/access";
 import { DEFAULT_METRICS, type AdhocRequest, type Profile, type Task } from "@/lib/types";
+import { DEFAULT_KRS, type KR } from "@/lib/kr-defaults";
 
 export type MembershipRow = { profile_id: string; program: string; role: "mo" | "user" };
 
@@ -101,6 +102,27 @@ export function distinctTags(tasks: Task[]): string[] {
 export function distinctMetrics(tasks: Task[]): string[] {
   const used = tasks.flatMap((t) => t.metrics ?? []);
   return Array.from(new Set([...DEFAULT_METRICS, ...used]));
+}
+
+// KRs, shared for everyone. DB-backed (admins manage them). Falls back to the
+// built-in defaults only if the table can't be read (e.g. before migration v15).
+export async function getKRs(): Promise<KR[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("krs")
+    .select("id, code, name, valid_for, metric_type, section, points, position, created_at")
+    .order("position", { ascending: true })
+    .order("created_at", { ascending: true });
+  if (error) return DEFAULT_KRS;
+  return (data ?? []).map((r: any) => ({
+    id: r.id,
+    code: r.code,
+    name: r.name,
+    validFor: r.valid_for,
+    metricType: r.metric_type,
+    section: r.section,
+    points: r.points ?? [],
+  }));
 }
 
 // The metric registry (single source of truth for pickers). Admins add/delete
