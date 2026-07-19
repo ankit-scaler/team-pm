@@ -78,7 +78,12 @@ function KRCard({ kr, isAdmin }: { kr: KR; isAdmin: boolean }) {
           <span className="rounded-md border border-border bg-surface-2 px-2 py-0.5 text-[11px] font-medium text-muted">
             {kr.validFor}
           </span>
-          {isAdmin && <KRDeleteButton id={kr.id} code={kr.code} />}
+          {isAdmin && (
+            <>
+              <KRForm kr={kr} />
+              <KRDeleteButton id={kr.id} code={kr.code} />
+            </>
+          )}
         </div>
       </div>
 
