@@ -5,6 +5,20 @@ import { DEFAULT_KRS, type KR } from "@/lib/kr-defaults";
 
 export type MembershipRow = { profile_id: string; program: string; role: "mo" | "user" };
 
+// Non-admin program scoping. Shows items in the user's programs PLUS
+// unclassified items (program IS NULL) — a task with no program isn't locked to
+// any program, so it shouldn't disappear for non-admins. Admins are unfiltered.
+function scopeByProgram<Q extends { in: any; or: any; is: any }>(
+  query: Q,
+  access: { isAdmin: boolean; visiblePrograms: string[] }
+): Q {
+  if (access.isAdmin) return query;
+  const progs = access.visiblePrograms;
+  if (progs.length === 0) return query.is("program", null);
+  const list = progs.map((p) => `"${p}"`).join(",");
+  return query.or(`program.in.(${list}),program.is.null`);
+}
+
 // All program memberships (for the management UI). Readable by any signed-in user.
 export async function getAllMemberships(): Promise<MembershipRow[]> {
   const supabase = createClient();
@@ -39,8 +53,8 @@ export async function getTasks(): Promise<Task[]> {
     )
     .order("created_at", { ascending: false });
 
-  // Program scoping: non-admins only see their programs (null-program = admin-only).
-  if (!access.isAdmin) query = query.in("program", access.visiblePrograms);
+  // Program scoping: non-admins see their programs + unclassified (null) items.
+  query = scopeByProgram(query, access);
 
   const { data, error } = await query;
 
@@ -75,8 +89,8 @@ export async function getAdhocRequests(): Promise<AdhocRequest[]> {
     )
     .order("created_at", { ascending: false });
 
-  // Program scoping (admins see all; null-program adhoc = admin-only).
-  if (!access.isAdmin) query = query.in("program", access.visiblePrograms);
+  // Program scoping: non-admins see their programs + unclassified (null) items.
+  query = scopeByProgram(query, access);
 
   const { data, error } = await query;
 
