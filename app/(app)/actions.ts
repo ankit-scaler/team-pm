@@ -53,6 +53,82 @@ export async function deleteMetric(name: string) {
   revalidatePath("/program-track");
 }
 
+// ----------------------------------------------------------------
+//  KRs — admin-managed, visible to everyone. Guarded server-side.
+// ----------------------------------------------------------------
+export async function createKR(formData: FormData) {
+  await requireAdmin();
+
+  const code = str(formData.get("code"));
+  const name = str(formData.get("name"));
+  if (!code || !name) throw new Error("Code and name are required");
+
+  const metricRaw = str(formData.get("metric_type"));
+  const metric_type = metricRaw === "Lagging" ? "Lagging" : "Leading";
+  const sectionRaw = str(formData.get("section"));
+  const section = sectionRaw === "good-practice" ? "good-practice" : "kr";
+  const valid_for = str(formData.get("valid_for")) ?? "Instructor Team";
+  const points = String(formData.get("points") ?? "")
+    .split("\n")
+    .map((p) => p.trim())
+    .filter(Boolean);
+
+  const admin = createAdminClient();
+  // Append after the current last KR.
+  const { data: last } = await admin
+    .from("krs")
+    .select("position")
+    .order("position", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const position = ((last?.position as number) ?? 0) + 10;
+
+  const { error } = await admin
+    .from("krs")
+    .insert({ code, name, valid_for, metric_type, section, points, position });
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/krs");
+}
+
+export async function updateKR(id: string, formData: FormData) {
+  await requireAdmin();
+  if (!id) return;
+
+  const code = str(formData.get("code"));
+  const name = str(formData.get("name"));
+  if (!code || !name) throw new Error("Code and name are required");
+
+  const metricRaw = str(formData.get("metric_type"));
+  const metric_type = metricRaw === "Lagging" ? "Lagging" : "Leading";
+  const sectionRaw = str(formData.get("section"));
+  const section = sectionRaw === "good-practice" ? "good-practice" : "kr";
+  const valid_for = str(formData.get("valid_for")) ?? "Instructor Team";
+  const points = String(formData.get("points") ?? "")
+    .split("\n")
+    .map((p) => p.trim())
+    .filter(Boolean);
+
+  const admin = createAdminClient();
+  // position is intentionally left as-is so the ordering doesn't jump on edit.
+  const { error } = await admin
+    .from("krs")
+    .update({ code, name, valid_for, metric_type, section, points })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/krs");
+}
+
+export async function deleteKR(id: string) {
+  await requireAdmin();
+  if (!id) return;
+  const admin = createAdminClient();
+  const { error } = await admin.from("krs").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+  revalidatePath("/krs");
+}
+
 // RBAC guard: a non-admin may only act within programs they belong to.
 async function assertProgramAllowed(program: string | null) {
   const access = await getMyAccess();
