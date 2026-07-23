@@ -37,6 +37,9 @@ export function TaskTable({
   programs = [],
   tracks = [],
   priorities = [],
+  efforts = [],
+  allowedPrograms = [],
+  canCreateMetrics = false,
 }: {
   tasks: Task[];
   people: Profile[];
@@ -45,6 +48,9 @@ export function TaskTable({
   programs?: string[];
   tracks?: string[];
   priorities?: string[];
+  efforts?: string[];
+  allowedPrograms?: string[];
+  canCreateMetrics?: boolean;
 }) {
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("");
@@ -250,7 +256,17 @@ export function TaskTable({
                   )}
                 </td>
                 <td className="px-4 py-3 text-right">
-                  <TaskForm people={people} task={t} allTags={allTags} allMetrics={allMetrics} />
+                  <TaskForm
+                    people={people}
+                    task={t}
+                    allTags={allTags}
+                    allMetrics={allMetrics}
+                    allowedPrograms={allowedPrograms}
+                    tracks={tracks}
+                    efforts={efforts}
+                    priorities={priorities}
+                    canCreateMetrics={canCreateMetrics}
+                  />
                 </td>
               </tr>
             ))}

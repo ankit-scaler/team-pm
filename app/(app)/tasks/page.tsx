@@ -44,7 +44,7 @@ export default async function TasksPage() {
           <TaskForm people={people} allTags={allTags} allMetrics={allMetrics} allowedPrograms={allowedPrograms} tracks={tracks} efforts={efforts} priorities={priorities} canCreateMetrics={access.isAdmin} />
         </div>
       </div>
-      <TaskTable tasks={tasks} people={people} allTags={allTags} allMetrics={allMetrics} programs={allPrograms} tracks={tracks} priorities={priorities} />
+      <TaskTable tasks={tasks} people={people} allTags={allTags} allMetrics={allMetrics} programs={allPrograms} tracks={tracks} priorities={priorities} efforts={efforts} allowedPrograms={allowedPrograms} canCreateMetrics={access.isAdmin} />
     </div>
   );
 }

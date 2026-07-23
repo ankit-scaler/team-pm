@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { CalendarCheck2, CalendarPlus } from "lucide-react";
+import { CalendarCheck2, CalendarPlus, ChevronDown } from "lucide-react";
 import { ThemeToggle } from "./theme-toggle";
 import type { Profile } from "@/lib/types";
 
@@ -28,8 +28,9 @@ export function Nav({
 }) {
   const pathname = usePathname();
   const [logoOk, setLogoOk] = useState(true);
-  const links = [
-    ...BASE_LINKS,
+  const [adminOpen, setAdminOpen] = useState(false);
+  const links = [...BASE_LINKS];
+  const adminLinks = [
     ...(isManager ? [{ href: "/admin", label: "Access" }] : []),
     ...(isAdmin
       ? [
@@ -40,6 +41,9 @@ export function Nav({
         ]
       : []),
   ];
+  const adminActive = adminLinks.some(
+    (l) => pathname === l.href || pathname.startsWith(l.href + "/")
+  );
 
   return (
     <header className="sticky top-0 z-20 border-b border-border bg-bg/80 backdrop-blur">
@@ -81,6 +85,53 @@ export function Nav({
               </Link>
             );
           })}
+
+          {adminLinks.length > 0 && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setAdminOpen((o) => !o)}
+                className={`relative flex items-center gap-1 rounded-md px-3 py-1.5 text-sm transition-colors ${
+                  adminActive
+                    ? "font-semibold text-fg"
+                    : "font-medium text-muted hover:bg-surface-2 hover:text-fg"
+                }`}
+              >
+                Admin
+                <ChevronDown
+                  size={14}
+                  className={`transition-transform ${adminOpen ? "rotate-180" : ""}`}
+                />
+                {adminActive && (
+                  <span className="absolute inset-x-2.5 -bottom-[15px] h-0.5 rounded-full bg-accent" />
+                )}
+              </button>
+              {adminOpen && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setAdminOpen(false)} />
+                  <div className="absolute left-0 top-full z-40 mt-2 min-w-[150px] overflow-hidden rounded-lg border border-border bg-surface py-1 shadow-lg">
+                    {adminLinks.map((l) => {
+                      const active = pathname === l.href || pathname.startsWith(l.href + "/");
+                      return (
+                        <Link
+                          key={l.href}
+                          href={l.href}
+                          onClick={() => setAdminOpen(false)}
+                          className={`block px-3 py-2 text-sm transition-colors ${
+                            active
+                              ? "bg-surface-2 font-semibold text-fg"
+                              : "text-muted hover:bg-surface-2 hover:text-fg"
+                          }`}
+                        >
+                          {l.label}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </nav>
 
         <div className="ml-auto flex shrink-0 items-center gap-2.5">

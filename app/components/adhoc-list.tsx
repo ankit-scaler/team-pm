@@ -35,10 +35,16 @@ export function AdhocList({
   requests,
   people = [],
   programs = [],
+  allowedPrograms = [],
+  allMetrics = [],
+  canCreateMetrics = false,
 }: {
   requests: AdhocRequest[];
   people?: Profile[];
   programs?: string[];
+  allowedPrograms?: string[];
+  allMetrics?: string[];
+  canCreateMetrics?: boolean;
 }) {
   const [q, setQ] = useState("");
   const [program, setProgram] = useState("");
@@ -204,7 +210,13 @@ export function AdhocList({
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center justify-end gap-1">
-                    <AdhocForm request={r} people={people} />
+                    <AdhocForm
+                      request={r}
+                      people={people}
+                      allowedPrograms={allowedPrograms}
+                      allMetrics={allMetrics}
+                      canCreateMetrics={canCreateMetrics}
+                    />
                     <AdhocDeleteButton id={r.id} />
                   </div>
                 </td>

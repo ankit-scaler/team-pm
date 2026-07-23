@@ -3,6 +3,14 @@
     {
       "path": "/api/keepalive",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/digests/weekly",
+      "schedule": "30 12 * * 5"
+    },
+    {
+      "path": "/api/digests/weekend",
+      "schedule": "30 3 * * 1"
     }
   ]
 }
