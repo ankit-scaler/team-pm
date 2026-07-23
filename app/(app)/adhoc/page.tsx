@@ -27,7 +27,7 @@ export default async function AdhocPage() {
         </div>
         <AdhocForm variant="solid" people={people} allowedPrograms={allowedPrograms} allMetrics={allMetrics} canCreateMetrics={access.isAdmin} />
       </div>
-      <AdhocList requests={requests} people={people} programs={allPrograms} />
+      <AdhocList requests={requests} people={people} programs={allPrograms} allowedPrograms={allowedPrograms} allMetrics={allMetrics} canCreateMetrics={access.isAdmin} />
     </div>
   );
 }

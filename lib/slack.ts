@@ -299,3 +299,67 @@ export async function notifyDueSoon(items: OverdueItem[], appUrl?: string): Prom
   const tagNames = items.map((i) => i.assignee).filter(Boolean) as string[];
   await deliver(`${header}\n${lines}`, { link: appUrl ? `${appUrl}/tasks` : undefined, tagNames });
 }
+
+// Post a plain message to a specific channel (used for the digest header).
+export async function postChannelMessage(channelId: string, text: string): Promise<boolean> {
+  if (!botToken() || !channelId) return false;
+  try {
+    const r = await slackApi("chat.postMessage", { channel: channelId, text, blocks: sectionBlocks(text) });
+    return !!r.ok;
+  } catch (e) {
+    console.error("Slack postChannelMessage failed:", e);
+    return false;
+  }
+}
+
+// Post a per-person "what got completed" summary to a SPECIFIC channel as an
+// aligned monospace table (Person | Task | Metrics). Names are plain text —
+// @-mentions don't render inside a code block. Used by the weekly/weekend crons.
+export async function postCompletionDigest(opts: {
+  channelId: string;
+  title: string;
+  perPerson: { name: string; items: { title: string; metrics: string[] }[] }[];
+  link?: string;
+}): Promise<{ posted: boolean }> {
+  if (!botToken() || !opts.channelId || opts.perPerson.length === 0) return { posted: false };
+
+  const P_CAP = 16;
+  const T_CAP = 40;
+  const M_CAP = 28;
+  const trunc = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
+
+  const rows: [string, string, string][] = [];
+  for (const p of opts.perPerson) {
+    p.items.forEach((it, i) => {
+      rows.push([
+        i === 0 ? trunc(p.name, P_CAP) : "",
+        trunc(it.title, T_CAP),
+        it.metrics.length > 0 ? trunc(it.metrics.join(", "), M_CAP) : "—",
+      ]);
+    });
+  }
+
+  const wP = Math.max("Person".length, ...rows.map((r) => r[0].length));
+  const wT = Math.max("Task".length, ...rows.map((r) => r[1].length));
+  const pad = (s: string, n: number) => s + " ".repeat(Math.max(0, n - s.length));
+  const line = (a: string, b: string, c: string) => `${pad(a, wP)} | ${pad(b, wT)} | ${c}`;
+  const table = [
+    line("Person", "Task", "Metrics"),
+    `${"-".repeat(wP)}-+-${"-".repeat(wT)}-+-${"-".repeat(M_CAP)}`,
+    ...rows.map((r) => line(r[0], r[1], r[2])),
+  ].join("\n");
+
+  const text = `${opts.title}\n\`\`\`\n${table}\n\`\`\``;
+
+  try {
+    await slackApi("chat.postMessage", {
+      channel: opts.channelId,
+      text,
+      blocks: sectionBlocks(text, opts.link),
+    });
+    return { posted: true };
+  } catch (e) {
+    console.error("Slack completion digest failed:", e);
+    return { posted: false };
+  }
+}
