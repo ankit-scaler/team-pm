@@ -30,13 +30,20 @@ export function Nav({
   const [logoOk, setLogoOk] = useState(true);
   const links = [
     ...BASE_LINKS,
-    ...(isManager ? [{ href: "/admin", label: "Team" }] : []),
-    ...(isAdmin ? [{ href: "/insights", label: "Insights" }, { href: "/summary", label: "Summary" }] : []),
+    ...(isManager ? [{ href: "/admin", label: "Access" }] : []),
+    ...(isAdmin
+      ? [
+          { href: "/insights", label: "Insights" },
+          { href: "/summary", label: "Summary" },
+          { href: "/activity", label: "Activity" },
+          { href: "/lists", label: "Lists" },
+        ]
+      : []),
   ];
 
   return (
     <header className="sticky top-0 z-20 border-b border-border bg-bg/80 backdrop-blur">
-      <div className="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4 sm:px-6">
+      <div className="flex h-14 items-center gap-4 px-4 sm:px-6">
         <Link href="/board" className="flex items-center gap-2">
           {logoOk ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -54,7 +61,7 @@ export function Nav({
           </span>
         </Link>
 
-        <nav className="ml-2 flex items-center gap-0.5">
+        <nav className="ml-2 flex shrink-0 items-center gap-0.5">
           {links.map((l) => {
             const active = pathname === l.href || pathname.startsWith(l.href + "/");
             return (
@@ -76,10 +83,10 @@ export function Nav({
           })}
         </nav>
 
-        <div className="ml-auto flex items-center gap-3">
+        <div className="ml-auto flex shrink-0 items-center gap-2.5">
           {calendarConnected ? (
             <span
-              className="hidden items-center gap-1.5 rounded-md border border-emerald-500/40 px-2.5 py-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400 sm:inline-flex"
+              className="hidden shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border border-emerald-500/40 px-2.5 py-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400 xl:inline-flex"
               title="Your Google Calendar is connected — new tasks with an ETA will block your stakeholders' calendars."
             >
               <CalendarCheck2 size={14} /> Calendar connected
@@ -87,14 +94,14 @@ export function Nav({
           ) : (
             <a
               href="/api/google/connect"
-              className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-muted transition-colors hover:text-fg hover:bg-surface-2"
+              className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-muted transition-colors hover:text-fg hover:bg-surface-2"
               title="Connect your Google Calendar so tasks you create with an ETA block your stakeholders' calendars."
             >
-              <CalendarPlus size={14} /> Connect Calendar
+              <CalendarPlus size={14} /> <span className="hidden lg:inline">Connect Calendar</span>
             </a>
           )}
           <ThemeToggle />
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             {profile.avatar_url ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
@@ -107,15 +114,15 @@ export function Nav({
                 {(profile.full_name ?? profile.email)[0]?.toUpperCase()}
               </span>
             )}
-            <div className="hidden text-right sm:block">
-              <div className="text-xs font-medium leading-tight">{profile.full_name}</div>
-              <div className="text-[11px] leading-tight text-muted">{profile.email}</div>
+            <div className="hidden max-w-[150px] text-right xl:block">
+              <div className="truncate text-xs font-medium leading-tight">{profile.full_name}</div>
+              <div className="truncate text-[11px] leading-tight text-muted">{profile.email}</div>
             </div>
           </div>
-          <form action="/auth/signout" method="post">
+          <form action="/auth/signout" method="post" className="shrink-0">
             <button
               type="submit"
-              className="rounded-md border border-border px-2.5 py-1.5 text-xs text-muted transition-colors hover:text-fg"
+              className="whitespace-nowrap rounded-md border border-border px-2.5 py-1.5 text-xs text-muted transition-colors hover:text-fg"
             >
               Sign out
             </button>

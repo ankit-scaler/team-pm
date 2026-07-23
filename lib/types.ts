@@ -1,10 +1,11 @@
 export type Status = "To pick" | "Working" | "In Review" | "Completed";
-export type Effort = "Low" | "Med" | "High";
-export type Priority = "Low" | "Medium" | "High" | "Urgent";
+// Effort & Priority are now admin-managed lists, so they're plain strings.
+export type Effort = string;
+export type Priority = string;
 
 export const STATUSES: Status[] = ["To pick", "Working", "In Review", "Completed"];
-export const EFFORTS: Effort[] = ["Low", "Med", "High"];
-export const PRIORITIES: Priority[] = ["Low", "Medium", "High", "Urgent"];
+export const EFFORTS: string[] = ["Low", "Med", "High"];
+export const PRIORITIES: string[] = ["Low", "Medium", "High", "Urgent"];
 
 // Starter list shown in the Metrics dropdown even before anyone has used them.
 // Anything typed beyond this list is just added to the suggestions automatically.
@@ -58,6 +59,7 @@ export type AdhocRequest = {
   source: "slack" | "manual";
   status: Status;
   eta: string | null;
+  eta_tbd?: boolean;
   delivered_date: string | null;
   metrics: string[];
   assignee_id: string | null;
@@ -85,6 +87,7 @@ export type Task = {
   title: string;
   description: string | null;
   eta: string | null;
+  eta_tbd?: boolean;
   status: Status;
   effort: Effort | null;
   priority: Priority;

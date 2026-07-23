@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { StatusBadge } from "./status-badge";
-import { PROGRAMS, type AdhocRequest, type Profile, type Status, type Task } from "@/lib/types";
+import { type AdhocRequest, type Profile, type Status, type Task } from "@/lib/types";
 
 type Item = {
   kind: "task" | "adhoc";
@@ -48,8 +48,16 @@ const openCalendar = (e: React.MouseEvent<HTMLInputElement>) =>
 
 // Admin-only. A drill-down to keep things uncluttered:
 //   program (+ date filters) → people → a person's metrics → the items for a metric.
-export function SummaryView({ tasks, adhoc }: { tasks: Task[]; adhoc: AdhocRequest[] }) {
-  const [program, setProgram] = useState<string>(PROGRAMS[0]);
+export function SummaryView({
+  tasks,
+  adhoc,
+  programs = [],
+}: {
+  tasks: Task[];
+  adhoc: AdhocRequest[];
+  programs?: string[];
+}) {
+  const [program, setProgram] = useState<string>(programs[0] ?? "");
   const [month, setMonth] = useState(""); // YYYY-MM, matched against ETA
   const [etaFrom, setEtaFrom] = useState("");
   const [etaTo, setEtaTo] = useState("");
@@ -165,7 +173,7 @@ export function SummaryView({ tasks, adhoc }: { tasks: Task[]; adhoc: AdhocReque
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm text-muted">Program</span>
         <select value={program} onChange={(e) => pickProgram(e.target.value)} className={selCls}>
-          {PROGRAMS.map((p) => (
+          {programs.map((p) => (
             <option key={p} value={p}>{p}</option>
           ))}
         </select>

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getMyAccess } from "@/lib/access";
-import { getTasks, getAdhocRequests } from "@/lib/queries";
+import { getTasks, getAdhocRequests, getPrograms } from "@/lib/queries";
 import { SummaryView } from "../../components/summary-view";
 
 export const dynamic = "force-dynamic";
@@ -10,7 +10,7 @@ export default async function SummaryPage() {
   if (!access.isAdmin) redirect("/board");
 
   // Admin's queries return all programs; the view filters by the chosen one.
-  const [tasks, adhoc] = await Promise.all([getTasks(), getAdhocRequests()]);
+  const [tasks, adhoc, programs] = await Promise.all([getTasks(), getAdhocRequests(), getPrograms()]);
 
   return (
     <div className="space-y-5">
@@ -21,7 +21,7 @@ export default async function SummaryPage() {
           each metric.
         </p>
       </div>
-      <SummaryView tasks={tasks} adhoc={adhoc} />
+      <SummaryView tasks={tasks} adhoc={adhoc} programs={programs} />
     </div>
   );
 }

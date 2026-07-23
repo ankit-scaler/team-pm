@@ -11,6 +11,7 @@ import { PROGRAMS, STATUSES, type AdhocRequest, type Profile } from "@/lib/types
 const fieldCls =
   "w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-fg outline-none transition-colors focus:border-accent hover:border-border-strong";
 const labelCls = "mb-1 block text-[12px] font-medium text-fg";
+const Req = () => <span className="text-red-500"> *</span>;
 
 export function AdhocForm({
   variant = "solid",
@@ -32,6 +33,7 @@ export function AdhocForm({
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [etaTbd, setEtaTbd] = useState(request?.eta_tbd ?? false);
   const router = useRouter();
   const isEdit = Boolean(request);
 
@@ -132,10 +134,20 @@ export function AdhocForm({
                   <input
                     type="date"
                     name="eta"
+                    disabled={etaTbd}
                     defaultValue={request?.eta ?? ""}
                     onClick={(e) => (e.currentTarget as any).showPicker?.()}
-                    className={`${fieldCls} cursor-pointer`}
+                    className={`${fieldCls} cursor-pointer disabled:opacity-50`}
                   />
+                  <label className="mt-1.5 flex items-center gap-1.5 text-[11px] font-normal text-muted">
+                    <input
+                      type="checkbox"
+                      name="eta_tbd"
+                      checked={etaTbd}
+                      onChange={(e) => setEtaTbd(e.target.checked)}
+                    />
+                    To be decided
+                  </label>
                 </div>
               </div>
 
@@ -153,8 +165,8 @@ export function AdhocForm({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className={labelCls}>For which program are we raising this?</label>
-                  <select name="program" defaultValue={request?.program ?? ""} className={fieldCls}>
+                  <label className={labelCls}>For which program are we raising this?<Req /></label>
+                  <select name="program" required defaultValue={request?.program ?? ""} className={fieldCls}>
                     <option value="">—</option>
                     {allowedPrograms.map((p) => (
                       <option key={p} value={p}>{p}</option>
@@ -162,46 +174,46 @@ export function AdhocForm({
                   </select>
                 </div>
                 <div>
-                  <label className={labelCls}>Which batch is this required for?</label>
-                  <input name="batch" defaultValue={request?.batch ?? ""} placeholder="Same name as on CCT" className={fieldCls} />
+                  <label className={labelCls}>Which batch is this required for?<Req /></label>
+                  <input name="batch" required defaultValue={request?.batch ?? ""} placeholder="Same name as on CCT" className={fieldCls} />
                 </div>
               </div>
 
               <div>
-                <label className={labelCls}>Which module are we solving for?</label>
-                <input name="module" defaultValue={request?.module ?? ""} placeholder="Same name as in CCT" className={fieldCls} />
+                <label className={labelCls}>Which module are we solving for?<Req /></label>
+                <input name="module" required defaultValue={request?.module ?? ""} placeholder="Same name as in CCT" className={fieldCls} />
               </div>
 
               <div>
-                <label className={labelCls}>What is the problem statement we are solving for?</label>
-                <textarea name="problem" rows={3} defaultValue={request?.problem ?? ""} placeholder="Briefly describe what you want the Instructor Team to support with." className={fieldCls} />
+                <label className={labelCls}>What is the problem statement we are solving for?<Req /></label>
+                <textarea name="problem" required rows={3} defaultValue={request?.problem ?? ""} placeholder="Briefly describe what you want the Instructor Team to support with." className={fieldCls} />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className={labelCls}>Who will benefit from this?</label>
-                  <input name="beneficiary" defaultValue={request?.beneficiary ?? ""} placeholder="Learners, Instructors, Program/CX Team…" className={fieldCls} />
+                  <label className={labelCls}>Who will benefit from this?<Req /></label>
+                  <input name="beneficiary" required defaultValue={request?.beneficiary ?? ""} placeholder="Learners, Instructors, Program/CX Team…" className={fieldCls} />
                 </div>
                 <div>
-                  <label className={labelCls}>How many learners will this impact?</label>
-                  <input name="learners_impact" defaultValue={request?.learners_impact ?? ""} placeholder="Approx number or %" className={fieldCls} />
+                  <label className={labelCls}>How many learners will this impact?<Req /></label>
+                  <input name="learners_impact" required defaultValue={request?.learners_impact ?? ""} placeholder="Approx number or %" className={fieldCls} />
                 </div>
               </div>
 
               <div>
-                <label className={labelCls}>What might happen if this is not done?</label>
-                <input name="risk_if_not_done" defaultValue={request?.risk_if_not_done ?? ""} placeholder="Cons with quantitative pointers" className={fieldCls} />
+                <label className={labelCls}>What might happen if this is not done?<Req /></label>
+                <input name="risk_if_not_done" required defaultValue={request?.risk_if_not_done ?? ""} placeholder="Cons with quantitative pointers" className={fieldCls} />
               </div>
 
               <div>
-                <label className={labelCls}>How will we measure success? Mention the metrics expected to improve and how they&apos;ll be tracked.</label>
-                <textarea name="outcome" rows={2} defaultValue={request?.outcome ?? ""} placeholder="e.g. tickets down from 30 to 5 per month" className={fieldCls} />
+                <label className={labelCls}>How will we measure success? Mention the metrics expected to improve and how they&apos;ll be tracked.<Req /></label>
+                <textarea name="outcome" required rows={2} defaultValue={request?.outcome ?? ""} placeholder="e.g. tickets down from 30 to 5 per month" className={fieldCls} />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className={labelCls}>Who should review this? (assignee)</label>
-                  <select name="assignee_id" defaultValue={request?.assignee_id ?? ""} className={fieldCls}>
+                  <label className={labelCls}>Who should review this? (assignee)<Req /></label>
+                  <select name="assignee_id" required defaultValue={request?.assignee_id ?? ""} className={fieldCls}>
                     <option value="">Unassigned</option>
                     {people.map((p) => (
                       <option key={p.id} value={p.id}>{p.full_name ?? p.email}</option>
@@ -209,8 +221,8 @@ export function AdhocForm({
                   </select>
                 </div>
                 <div>
-                  <label className={labelCls}>Tag the stakeholder for this request</label>
-                  <select name="stakeholder" defaultValue={request?.stakeholder ?? ""} className={fieldCls}>
+                  <label className={labelCls}>Tag the stakeholder for this request<Req /></label>
+                  <select name="stakeholder" required defaultValue={request?.stakeholder ?? ""} className={fieldCls}>
                     <option value="">—</option>
                     {people.map((p) => {
                       const n = p.full_name ?? p.email;
@@ -222,7 +234,8 @@ export function AdhocForm({
 
               <div>
                 <label className={labelCls}>
-                  Metrics{!canCreateMetrics && <span className="ml-1 text-muted">(select from list)</span>}
+                  Metrics<Req />
+                  {!canCreateMetrics && <span className="ml-1 text-muted">(select from list)</span>}
                 </label>
                 <TagSelect
                   suggestions={allMetrics}

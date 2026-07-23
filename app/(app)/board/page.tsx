@@ -1,6 +1,16 @@
-import { getPeople, getTasks, getAdhocRequests, distinctTags, getMetricNames } from "@/lib/queries";
+import {
+  getPeople,
+  getTasks,
+  getAdhocRequests,
+  distinctTags,
+  getMetricNames,
+  getPrograms,
+  getTracks,
+  getTags,
+  getEfforts,
+  getPriorities,
+} from "@/lib/queries";
 import { getMyAccess } from "@/lib/access";
-import { PROGRAMS } from "@/lib/types";
 import { KanbanBoard } from "../../components/kanban-board";
 import { TaskForm } from "../../components/task-form";
 import { AdhocForm } from "../../components/adhoc-form";
@@ -8,15 +18,21 @@ import { AdhocForm } from "../../components/adhoc-form";
 export const dynamic = "force-dynamic";
 
 export default async function BoardPage() {
-  const [tasks, people, adhocRequests, access, allMetrics] = await Promise.all([
-    getTasks(),
-    getPeople(),
-    getAdhocRequests(),
-    getMyAccess(),
-    getMetricNames(),
-  ]);
-  const allTags = distinctTags(tasks);
-  const allowedPrograms = access.isAdmin ? [...PROGRAMS] : access.visiblePrograms;
+  const [tasks, people, adhocRequests, access, allMetrics, allPrograms, tracks, tagList, efforts, priorities] =
+    await Promise.all([
+      getTasks(),
+      getPeople(),
+      getAdhocRequests(),
+      getMyAccess(),
+      getMetricNames(),
+      getPrograms(),
+      getTracks(),
+      getTags(),
+      getEfforts(),
+      getPriorities(),
+    ]);
+  const allTags = Array.from(new Set([...tagList, ...distinctTags(tasks)]));
+  const allowedPrograms = access.isAdmin ? allPrograms : access.visiblePrograms;
 
   return (
     <div className="space-y-5">
@@ -27,7 +43,7 @@ export default async function BoardPage() {
         </div>
         <div className="flex items-center gap-2">
           <AdhocForm variant="outline" people={people} allowedPrograms={allowedPrograms} allMetrics={allMetrics} canCreateMetrics={access.isAdmin} />
-          <TaskForm people={people} allTags={allTags} allMetrics={allMetrics} allowedPrograms={allowedPrograms} canCreateMetrics={access.isAdmin} />
+          <TaskForm people={people} allTags={allTags} allMetrics={allMetrics} allowedPrograms={allowedPrograms} tracks={tracks} efforts={efforts} priorities={priorities} canCreateMetrics={access.isAdmin} />
         </div>
       </div>
       <KanbanBoard
@@ -36,6 +52,14 @@ export default async function BoardPage() {
         adhocRequests={adhocRequests}
         allTags={allTags}
         allMetrics={allMetrics}
+        allPrograms={allowedPrograms}
+        tracks={tracks}
+        efforts={efforts}
+        priorities={priorities}
+        canCreateMetrics={access.isAdmin}
+        userId={access.userId}
+        isAdmin={access.isAdmin}
+        moPrograms={access.moPrograms}
       />
     </div>
   );

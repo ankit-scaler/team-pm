@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, MessageSquare, FileSpreadsheet, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, MessageSquare, FileSpreadsheet, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { changeStatus, changeAdhocStatus } from "../(app)/actions";
+import { changeStatus, changeAdhocStatus, deliverTask, startWorking } from "../(app)/actions";
 import { TaskForm } from "./task-form";
 import { AdhocDeleteButton } from "./adhoc-delete-button";
 import { AdhocForm } from "./adhoc-form";
@@ -48,17 +48,51 @@ export function KanbanBoard({
   adhocRequests = [],
   allTags = [],
   allMetrics = [],
+  allPrograms = [],
+  tracks = [],
+  efforts = [],
+  priorities = [],
+  canCreateMetrics = false,
+  userId = null,
+  isAdmin = false,
+  moPrograms = [],
 }: {
   tasks: Task[];
   people: Profile[];
   adhocRequests?: AdhocRequest[];
   allTags?: string[];
   allMetrics?: string[];
+  allPrograms?: string[];
+  tracks?: string[];
+  efforts?: string[];
+  priorities?: string[];
+  canCreateMetrics?: boolean;
+  userId?: string | null;
+  isAdmin?: boolean;
+  moPrograms?: string[];
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [movingId, setMovingId] = useState<string | null>(null);
+  const [delivering, setDelivering] = useState<Task | null>(null);
+  const [startingEta, setStartingEta] = useState<Task | null>(null);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [assignee, setAssignee] = useState("");
+
+  // Who can move a card: admins, its assignee, or an MO of its program.
+  const canMoveTask = (t: Task) =>
+    isAdmin || (!!userId && t.assignee_id === userId) || (!!t.program && moPrograms.includes(t.program));
+  const canMoveAdhoc = (a: AdhocRequest) =>
+    isAdmin || (!!userId && a.assignee_id === userId) || (!!a.program && moPrograms.includes(a.program));
+
+  function toggleExpand(id: string) {
+    setExpanded((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  }
   const [tag, setTag] = useState("");
   const [month, setMonth] = useState(""); // YYYY-MM, matched against ETA
   const [q, setQ] = useState("");
@@ -123,14 +157,26 @@ export function KanbanBoard({
   }, [tasks, adhocRequests]);
 
   function move(task: Task, dir: -1 | 1) {
+    if (!canMoveTask(task)) return;
     const idx = STATUSES.indexOf(task.status);
     const next = STATUSES[idx + dir];
     if (!next) return;
+    // Starting work needs a concrete ETA — collect one if the task has none / is TBD.
+    if (next === "Working" && !task.eta) {
+      setStartingEta(task);
+      return;
+    }
+    // Delivering a task requires a Slack + Sheet link — collect them first.
+    if (dir === 1 && next === "Completed") {
+      setDelivering(task);
+      return;
+    }
     setMovingId(task.id);
     startTransition(() => changeStatus(task.id, next as Status));
   }
 
   function moveAdhoc(a: AdhocRequest, dir: -1 | 1) {
+    if (!canMoveAdhoc(a)) return;
     const idx = STATUSES.indexOf(a.status);
     const next = STATUSES[idx + dir];
     if (!next) return;
@@ -204,7 +250,7 @@ export function KanbanBoard({
                 </span>
               </header>
 
-              <div className="flex-1 space-y-2 p-2">
+              <div className="flex-1 space-y-2 overflow-y-auto p-2 max-h-[calc(100vh-14rem)]">
                 {items.length === 0 && adhocItems.length === 0 && (
                   <p className="px-1 py-6 text-center text-xs text-muted">Nothing here</p>
                 )}
@@ -216,10 +262,15 @@ export function KanbanBoard({
                     people={people}
                     onMove={moveAdhoc}
                     moving={isPending && movingId === a.id}
+                    canMove={canMoveAdhoc(a)}
+                    allPrograms={allPrograms}
+                    allMetrics={allMetrics}
+                    canCreateMetrics={canCreateMetrics}
                   />
                 ))}
                 {items.map((t) => {
                   const moving = isPending && movingId === t.id;
+                  const isExpanded = expanded.has(t.id);
                   return (
                   <article
                     key={t.id}
@@ -232,13 +283,41 @@ export function KanbanBoard({
                     )}
                     {/* Title + action */}
                     <div className="flex items-start justify-between gap-2">
-                      <h3 className="text-[13px] font-semibold leading-snug text-fg">
-                        {t.title}
-                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => toggleExpand(t.id)}
+                        className="flex flex-1 items-start gap-1.5 text-left"
+                        title={t.description ? "Show details" : undefined}
+                      >
+                        {t.description ? (
+                          isExpanded ? (
+                            <ChevronUp size={14} className="mt-0.5 shrink-0 text-muted" />
+                          ) : (
+                            <ChevronDown size={14} className="mt-0.5 shrink-0 text-muted" />
+                          )
+                        ) : null}
+                        <h3 className="text-[13px] font-semibold leading-snug text-fg">{t.title}</h3>
+                      </button>
                       <div className="opacity-0 transition-opacity group-hover:opacity-100">
-                        <TaskForm people={people} task={t} allTags={allTags} allMetrics={allMetrics} />
+                        <TaskForm
+                          people={people}
+                          task={t}
+                          allTags={allTags}
+                          allMetrics={allMetrics}
+                          allowedPrograms={allPrograms}
+                          tracks={tracks}
+                          efforts={efforts}
+                          priorities={priorities}
+                          canCreateMetrics={canCreateMetrics}
+                        />
                       </div>
                     </div>
+
+                    {isExpanded && t.description && (
+                      <p className="mt-2 whitespace-pre-line rounded-md bg-surface-2/60 p-2 text-xs leading-relaxed text-fg/80">
+                        {t.description}
+                      </p>
+                    )}
 
                     {/* Meta row: priority · effort · ETA · delivered · delayed */}
                     <div className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-muted">
@@ -253,6 +332,12 @@ export function KanbanBoard({
                         <>
                           <span aria-hidden className="text-muted-2">·</span>
                           <span className="font-medium">ETA {fmt(t.eta)}</span>
+                        </>
+                      )}
+                      {!t.eta && t.eta_tbd && (
+                        <>
+                          <span aria-hidden className="text-muted-2">·</span>
+                          <span className="font-medium">ETA TBD</span>
                         </>
                       )}
                       {t.status === "Completed" && t.delivered_date && (
@@ -331,6 +416,7 @@ export function KanbanBoard({
                             {t.assignee ? (t.assignee.full_name ?? t.assignee.email) : "Unassigned"}
                           </span>
                         </span>
+                        {canMoveTask(t) && (
                         <div className="flex items-center gap-0.5">
                         <button
                           type="button"
@@ -351,6 +437,7 @@ export function KanbanBoard({
                           <ChevronRight size={14} />
                         </button>
                       </div>
+                        )}
                       </div>
                     </div>
                   </article>
@@ -360,6 +447,184 @@ export function KanbanBoard({
             </section>
           );
         })}
+      </div>
+
+      {delivering && (
+        <DeliverDialog task={delivering} onClose={() => setDelivering(null)} />
+      )}
+      {startingEta && (
+        <SetEtaDialog task={startingEta} onClose={() => setStartingEta(null)} />
+      )}
+    </div>
+  );
+}
+
+// Popup shown when a task is moved to Working without a concrete ETA — collects
+// the ETA date, then starts the task.
+function SetEtaDialog({ task, onClose }: { task: Task; onClose: () => void }) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const [eta, setEta] = useState("");
+
+  function submit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setError(null);
+    if (!eta) {
+      setError("An ETA date is required to start working.");
+      return;
+    }
+    startTransition(async () => {
+      try {
+        await startWorking(task.id, eta);
+        onClose();
+        router.refresh();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Could not start this task.");
+      }
+    });
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-40 grid place-items-center overflow-y-auto bg-black/40 p-4 backdrop-blur-sm"
+      onMouseDown={onClose}
+    >
+      <div
+        className="relative w-full max-w-md rounded-xl border border-border bg-surface p-5 shadow-xl"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <h2 className="text-base font-semibold">Set an ETA to start</h2>
+        <p className="mt-1 text-sm text-muted">
+          <span className="font-medium text-fg/80">{task.title}</span> needs a real ETA date before
+          it can move to Working. (A &ldquo;to be decided&rdquo; ETA isn&apos;t enough.)
+        </p>
+
+        <form onSubmit={submit} className="mt-4 space-y-3">
+          <div>
+            <label className="mb-1 block text-[12px] font-medium text-fg">ETA</label>
+            <input
+              type="date"
+              required
+              value={eta}
+              onChange={(e) => setEta(e.target.value)}
+              onClick={(e) => (e.currentTarget as any).showPicker?.()}
+              className="w-full cursor-pointer rounded-lg border border-border bg-surface px-3 py-2 text-sm text-fg outline-none focus:border-accent"
+            />
+          </div>
+
+          {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+
+          <div className="flex justify-end gap-2 pt-1">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg border border-border px-3 py-2 text-sm text-muted hover:text-fg"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={pending}
+              className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:opacity-90 disabled:opacity-60"
+            >
+              {pending ? "Starting…" : "Start working"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// Popup shown when a task is moved to Delivered (Completed). Requires a Slack
+// link and a Sheet link before the move goes through.
+function DeliverDialog({ task, onClose }: { task: Task; onClose: () => void }) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const [slack, setSlack] = useState(task.slack_link ?? "");
+  const [sheet, setSheet] = useState(task.sheet_link ?? "");
+
+  const inputCls =
+    "w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-fg outline-none transition-colors focus:border-accent";
+
+  function submit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setError(null);
+    if (!slack.trim() || !sheet.trim()) {
+      setError("Both a Slack link and a Sheet link are required.");
+      return;
+    }
+    startTransition(async () => {
+      try {
+        await deliverTask(task.id, slack.trim(), sheet.trim());
+        onClose();
+        router.refresh();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Could not deliver this task.");
+      }
+    });
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-40 grid place-items-center overflow-y-auto bg-black/40 p-4 backdrop-blur-sm"
+      onMouseDown={onClose}
+    >
+      <div
+        className="relative w-full max-w-md rounded-xl border border-border bg-surface p-5 shadow-xl"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <h2 className="text-base font-semibold">Deliver task</h2>
+        <p className="mt-1 text-sm text-muted">
+          Add the Slack link and Sheet link before marking{" "}
+          <span className="font-medium text-fg/80">{task.title}</span> as Delivered.
+        </p>
+
+        <form onSubmit={submit} className="mt-4 space-y-3">
+          <div>
+            <label className="mb-1 block text-[12px] font-medium text-fg">Slack link</label>
+            <input
+              type="url"
+              required
+              value={slack}
+              onChange={(e) => setSlack(e.target.value)}
+              placeholder="https://slack.com/…"
+              className={inputCls}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-[12px] font-medium text-fg">Sheet link</label>
+            <input
+              type="url"
+              required
+              value={sheet}
+              onChange={(e) => setSheet(e.target.value)}
+              placeholder="https://docs.google.com/…"
+              className={inputCls}
+            />
+          </div>
+
+          {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+
+          <div className="flex justify-end gap-2 pt-1">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg border border-border px-3 py-2 text-sm text-muted hover:text-fg"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={pending}
+              className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:opacity-90 disabled:opacity-60"
+            >
+              {pending ? "Delivering…" : "Mark Delivered"}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
@@ -372,12 +637,20 @@ function AdhocCard({
   people,
   onMove,
   moving = false,
+  canMove = false,
+  allPrograms = [],
+  allMetrics = [],
+  canCreateMetrics = false,
 }: {
   a: AdhocRequest;
   col: Status;
   people: Profile[];
   onMove: (a: AdhocRequest, dir: -1 | 1) => void;
   moving?: boolean;
+  canMove?: boolean;
+  allPrograms?: string[];
+  allMetrics?: string[];
+  canCreateMetrics?: boolean;
 }) {
   const title = a.title || a.module || a.program || "Adhoc request";
   return (
@@ -399,6 +672,9 @@ function AdhocCard({
             <AdhocForm
               request={a}
               people={people}
+              allowedPrograms={allPrograms}
+              allMetrics={allMetrics}
+              canCreateMetrics={canCreateMetrics}
               triggerClassName="grid h-6 w-6 place-items-center rounded text-muted transition-colors hover:bg-surface-2 hover:text-fg"
             />
             <AdhocDeleteButton
@@ -481,6 +757,7 @@ function AdhocCard({
             {a.assignee ? (a.assignee.full_name ?? a.assignee.email) : "Unassigned"}
           </span>
         </span>
+        {canMove && (
         <div className="flex items-center gap-0.5">
           <button
             type="button"
@@ -501,6 +778,7 @@ function AdhocCard({
             <ChevronRight size={14} />
           </button>
         </div>
+        )}
         </div>
       </div>
     </article>

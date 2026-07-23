@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { PROGRAMS, type AdhocRequest, type Profile, type Task } from "@/lib/types";
+import { type AdhocRequest, type Profile, type Task } from "@/lib/types";
 
 type PersonStat = {
   id: string;
@@ -31,7 +31,15 @@ function fmtMonth(ym: string) {
 const openCalendar = (e: React.MouseEvent<HTMLInputElement>) =>
   (e.currentTarget as any).showPicker?.();
 
-export function InsightsView({ tasks, adhoc = [] }: { tasks: Task[]; adhoc?: AdhocRequest[] }) {
+export function InsightsView({
+  tasks,
+  adhoc = [],
+  programs = [],
+}: {
+  tasks: Task[];
+  adhoc?: AdhocRequest[];
+  programs?: string[];
+}) {
   const [program, setProgram] = useState("");
   const [month, setMonth] = useState(""); // YYYY-MM, matched against ETA
   const [etaFrom, setEtaFrom] = useState("");
@@ -115,7 +123,7 @@ export function InsightsView({ tasks, adhoc = [] }: { tasks: Task[]; adhoc?: Adh
       <div className="flex flex-wrap items-center gap-2">
         <select value={program} onChange={(e) => setProgram(e.target.value)} className={selCls}>
           <option value="">All programs</option>
-          {PROGRAMS.map((p) => (
+          {programs.map((p) => (
             <option key={p} value={p}>{p}</option>
           ))}
         </select>

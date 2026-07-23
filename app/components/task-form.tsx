@@ -7,18 +7,22 @@ import { createTask, updateTask, deleteTask, deleteMetric } from "../(app)/actio
 import { StakeholderSelect } from "./stakeholder-select";
 import { TagSelect } from "./tag-select";
 import { Loader } from "./loader";
-import { STATUSES, EFFORTS, PRIORITIES, PROGRAMS, TRACKS, type Profile, type Task } from "@/lib/types";
+import { STATUSES, type Profile, type Task } from "@/lib/types";
 
 const fieldCls =
   "w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-fg outline-none transition-colors focus:border-accent hover:border-border-strong";
 const labelCls = "mb-1 block text-[11px] font-semibold uppercase tracking-wide text-muted";
+const Req = () => <span className="text-red-500"> *</span>;
 
 export function TaskForm({
   people,
   task,
   allTags = [],
   allMetrics = [],
-  allowedPrograms = PROGRAMS as unknown as string[],
+  allowedPrograms = [],
+  tracks = [],
+  efforts = [],
+  priorities = [],
   canCreateMetrics = false,
 }: {
   people: Profile[];
@@ -26,11 +30,15 @@ export function TaskForm({
   allTags?: string[];
   allMetrics?: string[];
   allowedPrograms?: string[];
+  tracks?: string[];
+  efforts?: string[];
+  priorities?: string[];
   canCreateMetrics?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [etaTbd, setEtaTbd] = useState(task?.eta_tbd ?? false);
   const router = useRouter();
   const isEdit = Boolean(task);
 
@@ -115,7 +123,7 @@ export function TaskForm({
 
             <form onSubmit={onSubmit} className="space-y-3">
               <div>
-                <label className={labelCls}>Title</label>
+                <label className={labelCls}>Title<Req /></label>
                 <input
                   name="title"
                   required
@@ -138,8 +146,8 @@ export function TaskForm({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className={labelCls}>Assignee (picked by)</label>
-                  <select name="assignee_id" defaultValue={task?.assignee_id ?? ""} className={fieldCls}>
+                  <label className={labelCls}>Assignee (picked by)<Req /></label>
+                  <select name="assignee_id" required defaultValue={task?.assignee_id ?? ""} className={fieldCls}>
                     <option value="">Unassigned</option>
                     {people.map((p) => (
                       <option key={p.id} value={p.id}>
@@ -162,9 +170,9 @@ export function TaskForm({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className={labelCls}>Priority</label>
+                  <label className={labelCls}>Priority<Req /></label>
                   <select name="priority" defaultValue={task?.priority ?? "Medium"} className={fieldCls}>
-                    {PRIORITIES.map((p) => (
+                    {priorities.map((p) => (
                       <option key={p} value={p}>
                         {p}
                       </option>
@@ -175,7 +183,7 @@ export function TaskForm({
                   <label className={labelCls}>Effort</label>
                   <select name="effort" defaultValue={task?.effort ?? ""} className={fieldCls}>
                     <option value="">—</option>
-                    {EFFORTS.map((e) => (
+                    {efforts.map((e) => (
                       <option key={e} value={e}>
                         {e}
                       </option>
@@ -186,8 +194,8 @@ export function TaskForm({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className={labelCls}>Program</label>
-                  <select name="program" defaultValue={task?.program ?? ""} className={fieldCls}>
+                  <label className={labelCls}>Program<Req /></label>
+                  <select name="program" required defaultValue={task?.program ?? ""} className={fieldCls}>
                     <option value="">—</option>
                     {allowedPrograms.map((p) => (
                       <option key={p} value={p}>{p}</option>
@@ -195,10 +203,10 @@ export function TaskForm({
                   </select>
                 </div>
                 <div>
-                  <label className={labelCls}>Track</label>
-                  <select name="track" defaultValue={task?.track ?? ""} className={fieldCls}>
+                  <label className={labelCls}>Track<Req /></label>
+                  <select name="track" required defaultValue={task?.track ?? ""} className={fieldCls}>
                     <option value="">—</option>
-                    {TRACKS.map((t) => (
+                    {tracks.map((t) => (
                       <option key={t} value={t}>{t}</option>
                     ))}
                   </select>
@@ -207,14 +215,25 @@ export function TaskForm({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className={labelCls}>ETA</label>
+                  <label className={labelCls}>ETA<Req /></label>
                   <input
                     type="date"
                     name="eta"
+                    required={!etaTbd}
+                    disabled={etaTbd}
                     defaultValue={task?.eta ?? ""}
                     onClick={(e) => (e.currentTarget as any).showPicker?.()}
-                    className={`${fieldCls} cursor-pointer`}
+                    className={`${fieldCls} cursor-pointer disabled:opacity-50`}
                   />
+                  <label className="mt-1.5 flex items-center gap-1.5 text-[11px] font-normal normal-case text-muted">
+                    <input
+                      type="checkbox"
+                      name="eta_tbd"
+                      checked={etaTbd}
+                      onChange={(e) => setEtaTbd(e.target.checked)}
+                    />
+                    To be decided
+                  </label>
                 </div>
                 <div>
                   <label className={labelCls}>Delivered date</label>
@@ -237,13 +256,21 @@ export function TaskForm({
               </div>
 
               <div>
-                <label className={labelCls}>Tags</label>
-                <TagSelect suggestions={allTags} defaultTags={task?.tags ?? []} />
+                <label className={labelCls}>
+                  Tags{!canCreateMetrics && <span className="ml-1 font-normal normal-case text-muted">(select from list)</span>}
+                </label>
+                <TagSelect
+                  suggestions={allTags}
+                  defaultTags={task?.tags ?? []}
+                  allowCreate={canCreateMetrics}
+                  placeholder={canCreateMetrics ? "Add tags…" : "Select tags…"}
+                />
               </div>
 
               <div>
                 <label className={labelCls}>
-                  Metrics{!canCreateMetrics && <span className="ml-1 font-normal text-muted">(select from list)</span>}
+                  Metrics<Req />
+                  {!canCreateMetrics && <span className="ml-1 font-normal text-muted">(select from list)</span>}
                 </label>
                 <TagSelect
                   suggestions={allMetrics}
