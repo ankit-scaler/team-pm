@@ -5,7 +5,7 @@ import { MessageSquare, Slack } from "lucide-react";
 import { StatusBadge } from "./status-badge";
 import { AdhocDeleteButton } from "./adhoc-delete-button";
 import { AdhocForm } from "./adhoc-form";
-import { PROGRAMS, type AdhocRequest, type Profile } from "@/lib/types";
+import { type AdhocRequest, type Profile } from "@/lib/types";
 
 const selCls = "rounded-lg border border-border bg-surface px-2.5 py-1.5 text-sm outline-none";
 
@@ -31,7 +31,15 @@ function isDelayed(r: AdhocRequest) {
   return r.status === "Completed" && !!r.eta && !!r.delivered_date && r.delivered_date > r.eta;
 }
 
-export function AdhocList({ requests, people = [] }: { requests: AdhocRequest[]; people?: Profile[] }) {
+export function AdhocList({
+  requests,
+  people = [],
+  programs = [],
+}: {
+  requests: AdhocRequest[];
+  people?: Profile[];
+  programs?: string[];
+}) {
   const [q, setQ] = useState("");
   const [program, setProgram] = useState("");
   const [source, setSource] = useState("");
@@ -68,7 +76,7 @@ export function AdhocList({ requests, people = [] }: { requests: AdhocRequest[];
         />
         <select value={program} onChange={(e) => setProgram(e.target.value)} className={selCls}>
           <option value="">All programs</option>
-          {PROGRAMS.map((p) => (
+          {programs.map((p) => (
             <option key={p} value={p}>{p}</option>
           ))}
         </select>

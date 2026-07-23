@@ -1,8 +1,4 @@
-import {
-  type Status,
-  type Priority,
-  type Effort,
-} from "@/lib/types";
+import { type Status } from "@/lib/types";
 
 // ─── Unified design language ────────────────────────────────
 // The idea: chips look consistent. Semantic color lives in a small dot,
@@ -22,7 +18,7 @@ const STATUS_TEXT: Record<Status, string> = {
   Completed: "text-emerald-700 dark:text-emerald-300",
 };
 
-const PRIORITY_DOT: Record<Priority, string> = {
+const PRIORITY_DOT: Record<string, string> = {
   Low: "bg-slate-400",
   Medium: "bg-blue-500",
   High: "bg-orange-500",
@@ -40,16 +36,16 @@ export function StatusBadge({ status }: { status: Status }) {
   );
 }
 
-export function PriorityLabel({ priority }: { priority: Priority }) {
+export function PriorityLabel({ priority }: { priority: string }) {
   return (
     <span className="inline-flex items-center gap-1.5 text-xs font-medium text-fg/80">
-      <span className={`h-1.5 w-1.5 rounded-full ${PRIORITY_DOT[priority]}`} />
+      <span className={`h-1.5 w-1.5 rounded-full ${PRIORITY_DOT[priority] ?? "bg-slate-400"}`} />
       {priority}
     </span>
   );
 }
 
-export function EffortChip({ effort }: { effort: Effort | null }) {
+export function EffortChip({ effort }: { effort: string | null }) {
   if (!effort) return null;
   return (
     <span className="text-xs font-medium text-fg/80">

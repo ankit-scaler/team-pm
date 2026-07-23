@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { MessageSquare, FileSpreadsheet } from "lucide-react";
 import { TaskForm } from "./task-form";
 import { StatusBadge, PriorityLabel, EffortChip } from "./status-badge";
-import { STATUSES, PRIORITIES, PROGRAMS, TRACKS, type Profile, type Task } from "@/lib/types";
+import { STATUSES, type Profile, type Task } from "@/lib/types";
 
 function fmt(d: string | null) {
   if (!d) return "—";
@@ -34,11 +34,17 @@ export function TaskTable({
   people,
   allTags = [],
   allMetrics = [],
+  programs = [],
+  tracks = [],
+  priorities = [],
 }: {
   tasks: Task[];
   people: Profile[];
   allTags?: string[];
   allMetrics?: string[];
+  programs?: string[];
+  tracks?: string[];
+  priorities?: string[];
 }) {
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("");
@@ -103,7 +109,7 @@ export function TaskTable({
         </select>
         <select value={priority} onChange={(e) => setPriority(e.target.value)} className={selCls}>
           <option value="">All priorities</option>
-          {PRIORITIES.map((p) => (
+          {priorities.map((p) => (
             <option key={p} value={p}>{p}</option>
           ))}
         </select>
@@ -125,13 +131,13 @@ export function TaskTable({
         )}
         <select value={program} onChange={(e) => setProgram(e.target.value)} className={selCls}>
           <option value="">All programs</option>
-          {PROGRAMS.map((p) => (
+          {programs.map((p) => (
             <option key={p} value={p}>{p}</option>
           ))}
         </select>
         <select value={track} onChange={(e) => setTrack(e.target.value)} className={selCls}>
           <option value="">All tracks</option>
-          {TRACKS.map((t) => (
+          {tracks.map((t) => (
             <option key={t} value={t}>{t}</option>
           ))}
         </select>
@@ -232,7 +238,7 @@ export function TaskTable({
                 <td className="px-4 py-3"><PriorityLabel priority={t.priority} /></td>
                 <td className="px-4 py-3"><EffortChip effort={t.effort} /></td>
                 <td className={`px-4 py-3 ${isOverdue(t) ? "font-medium text-red-600 dark:text-red-400" : ""}`}>
-                  {fmt(t.eta)}
+                  {t.eta ? fmt(t.eta) : t.eta_tbd ? "TBD" : "—"}
                   {isOverdue(t) && <span className="ml-1 text-[11px]">overdue</span>}
                 </td>
                 <td className="px-4 py-3 text-muted">

@@ -1,6 +1,6 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { getMyAccess } from "@/lib/access";
-import { DEFAULT_METRICS, type AdhocRequest, type Profile, type Task } from "@/lib/types";
+import { DEFAULT_METRICS, PROGRAMS, TRACKS, EFFORTS, PRIORITIES, type AdhocRequest, type Profile, type Task } from "@/lib/types";
 import { DEFAULT_KRS, type KR } from "@/lib/kr-defaults";
 
 export type MembershipRow = { profile_id: string; program: string; role: "mo" | "user" };
@@ -84,7 +84,7 @@ export async function getAdhocRequests(): Promise<AdhocRequest[]> {
   let query = supabase
     .from("adhoc_requests")
     .select(
-      `id, source, status, eta, delivered_date, metrics, assignee_id, slack_ts, permalink, title, posted_at, created_at, raised_by, program, batch, module, beneficiary, problem, learners_impact, risk_if_not_done, outcome, module_owner, stakeholder,
+      `id, source, status, eta, eta_tbd, delivered_date, metrics, assignee_id, slack_ts, permalink, title, posted_at, created_at, raised_by, program, batch, module, beneficiary, problem, learners_impact, risk_if_not_done, outcome, module_owner, stakeholder,
        assignee:profiles!adhoc_requests_assignee_id_fkey (${PROFILE_COLS})`
     )
     .order("created_at", { ascending: false });
@@ -118,6 +118,45 @@ export function distinctMetrics(tasks: Task[]): string[] {
   return Array.from(new Set([...DEFAULT_METRICS, ...used]));
 }
 
+// Admin activity log. Read via the service-role client (the table has no client
+// RLS policy); the Activity page is admin-gated.
+export type ActivityEntry = {
+  id: string;
+  actorId: string | null;
+  actorName: string;
+  action: string;
+  entityType: string;
+  entityId: string | null;
+  entityLabel: string | null;
+  summary: string;
+  program: string | null;
+  createdAt: string;
+};
+
+export async function getActivityLog(limit = 1000): Promise<ActivityEntry[]> {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("activity_log")
+    .select(
+      "id, actor_id, actor_name, action, entity_type, entity_id, entity_label, summary, program, created_at"
+    )
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error || !data) return [];
+  return data.map((r: any) => ({
+    id: r.id,
+    actorId: r.actor_id,
+    actorName: r.actor_name,
+    action: r.action,
+    entityType: r.entity_type,
+    entityId: r.entity_id,
+    entityLabel: r.entity_label,
+    summary: r.summary,
+    program: r.program,
+    createdAt: r.created_at,
+  }));
+}
+
 // KRs, shared for everyone. DB-backed (admins manage them). Falls back to the
 // built-in defaults only if the table can't be read (e.g. before migration v15).
 export async function getKRs(): Promise<KR[]> {
@@ -137,6 +176,39 @@ export async function getKRs(): Promise<KR[]> {
     section: r.section,
     points: r.points ?? [],
   }));
+}
+
+// Programs & tracks registries — admins add these; everyone picks from them.
+// Fall back to the built-in lists if the tables aren't there yet (pre-migration).
+export async function getPrograms(): Promise<string[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase.from("programs").select("name").order("name");
+  if (error || !data) return [...PROGRAMS];
+  return data.map((r: any) => r.name as string);
+}
+export async function getTracks(): Promise<string[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase.from("tracks").select("name").order("name");
+  if (error || !data) return [...TRACKS];
+  return data.map((r: any) => r.name as string);
+}
+export async function getTags(): Promise<string[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase.from("tags").select("name").order("name");
+  if (error || !data) return [];
+  return data.map((r: any) => r.name as string);
+}
+export async function getEfforts(): Promise<string[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase.from("efforts").select("name").order("position");
+  if (error || !data) return [...EFFORTS];
+  return data.map((r: any) => r.name as string);
+}
+export async function getPriorities(): Promise<string[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase.from("priorities").select("name").order("position");
+  if (error || !data) return [...PRIORITIES];
+  return data.map((r: any) => r.name as string);
 }
 
 // The metric registry (single source of truth for pickers). Admins add/delete

@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { StatusBadge, PriorityLabel, EffortChip } from "./status-badge";
 import { TaskForm } from "./task-form";
-import { PROGRAMS, TRACKS, STATUSES, type Profile, type Task } from "@/lib/types";
+import { STATUSES, type Profile, type Task } from "@/lib/types";
 
 function fmt(d: string | null) {
   if (!d) return "—";
@@ -28,11 +28,19 @@ export function ProgramTrackView({
   people,
   allTags = [],
   allMetrics = [],
+  programs = [],
+  tracks = [],
+  efforts = [],
+  priorities = [],
 }: {
   tasks: Task[];
   people: Profile[];
   allTags?: string[];
   allMetrics?: string[];
+  programs?: string[];
+  tracks?: string[];
+  efforts?: string[];
+  priorities?: string[];
 }) {
   const [program, setProgram] = useState("");
   const [track, setTrack] = useState("");
@@ -65,13 +73,13 @@ export function ProgramTrackView({
       <div className="flex flex-wrap items-center gap-2">
         <select value={program} onChange={(e) => setProgram(e.target.value)} className={selCls}>
           <option value="">All programs</option>
-          {PROGRAMS.map((p) => (
+          {programs.map((p) => (
             <option key={p} value={p}>{p}</option>
           ))}
         </select>
         <select value={track} onChange={(e) => setTrack(e.target.value)} className={selCls}>
           <option value="">All tracks</option>
-          {TRACKS.map((t) => (
+          {tracks.map((t) => (
             <option key={t} value={t}>{t}</option>
           ))}
         </select>
@@ -185,7 +193,7 @@ export function ProgramTrackView({
                   )}
                 </td>
                 <td className="px-4 py-3 text-right">
-                  <TaskForm people={people} task={t} allTags={allTags} allMetrics={allMetrics} />
+                  <TaskForm people={people} task={t} allTags={allTags} allMetrics={allMetrics} allowedPrograms={programs} tracks={tracks} efforts={efforts} priorities={priorities} />
                 </td>
               </tr>
             ))}
