@@ -45,9 +45,14 @@ export function TaskForm({
   function onDeleteMetric(name: string) {
     if (!confirm(`Delete the metric “${name}” everywhere?\nIt will be removed from every task and adhoc request.`))
       return;
+    setError(null);
     startTransition(async () => {
-      await deleteMetric(name);
-      router.refresh();
+      try {
+        await deleteMetric(name);
+        router.refresh();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Could not delete this metric.");
+      }
     });
   }
 
@@ -68,9 +73,14 @@ export function TaskForm({
 
   function onDelete() {
     if (!task || !confirm("Delete this task? This can't be undone.")) return;
+    setError(null);
     startTransition(async () => {
-      await deleteTask(task.id);
-      setOpen(false);
+      try {
+        await deleteTask(task.id);
+        setOpen(false);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Could not delete this task.");
+      }
     });
   }
 

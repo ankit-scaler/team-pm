@@ -269,7 +269,10 @@ export async function createPriority(name: string) {
 async function assertProgramAllowed(program: string | null) {
   const access = await getMyAccess();
   if (access.isAdmin) return;
-  if (!program || !access.visiblePrograms.includes(program)) {
+  // Unclassified (no-program) items are visible to everyone, so they're
+  // actionable by everyone too — matches the scoping in getTasks/getAdhoc.
+  if (!program) return;
+  if (!access.visiblePrograms.includes(program)) {
     throw new Error("You don't have access to that program.");
   }
 }
@@ -898,9 +901,14 @@ export async function deleteTask(taskId: string) {
   const { error } = await supabase.from("tasks").delete().eq("id", taskId);
   if (error) throw new Error(error.message);
 
-  // Task 1: remove any calendar block for this task.
+  // Task 1: remove any calendar block for this task (best-effort — a Google
+  // hiccup must not fail the delete the user already confirmed).
   if (before?.calendar_event_id) {
-    await deleteTaskCalendarEvent(before.created_by ?? null, before.calendar_event_id);
+    try {
+      await deleteTaskCalendarEvent(before.created_by ?? null, before.calendar_event_id);
+    } catch (e) {
+      console.error("Calendar cleanup on task delete failed:", e);
+    }
   }
 
   await logActivity(
@@ -1150,7 +1158,11 @@ export async function deleteAdhocRequest(id: string) {
   if (error) throw new Error(error.message);
 
   if (before?.calendar_event_id) {
-    await deleteTaskCalendarEvent(before.created_by ?? null, before.calendar_event_id);
+    try {
+      await deleteTaskCalendarEvent(before.created_by ?? null, before.calendar_event_id);
+    } catch (e) {
+      console.error("Calendar cleanup on adhoc delete failed:", e);
+    }
   }
 
   const label = before?.title ?? before?.module ?? "(unknown)";

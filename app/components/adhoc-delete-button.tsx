@@ -10,7 +10,13 @@ export function AdhocDeleteButton({ id, className }: { id: string; className?: s
 
   function onClick() {
     if (!confirm("Delete this adhoc request? This can't be undone.")) return;
-    startTransition(() => deleteAdhocRequest(id));
+    startTransition(async () => {
+      try {
+        await deleteAdhocRequest(id);
+      } catch (err) {
+        alert(err instanceof Error ? err.message : "Could not delete this adhoc request.");
+      }
+    });
   }
 
   return (
