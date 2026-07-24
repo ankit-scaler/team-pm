@@ -330,7 +330,6 @@ export async function postCompletionDigest(opts: {
 
   const P_CAP = 16;
   const T_CAP = 40;
-  const M_CAP = 28;
   const trunc = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
 
   const rows: [string, string, string][] = [];
@@ -339,18 +338,20 @@ export async function postCompletionDigest(opts: {
       rows.push([
         i === 0 ? trunc(p.name, P_CAP) : "",
         trunc(it.title, T_CAP),
-        it.metrics.length > 0 ? trunc(it.metrics.join(", "), M_CAP) : "—",
+        // Metrics is the last column — show it in full (no truncation).
+        it.metrics.length > 0 ? it.metrics.join(", ") : "—",
       ]);
     });
   }
 
   const wP = Math.max("Person".length, ...rows.map((r) => r[0].length));
   const wT = Math.max("Task".length, ...rows.map((r) => r[1].length));
+  const wM = Math.max("Metrics".length, ...rows.map((r) => r[2].length));
   const pad = (s: string, n: number) => s + " ".repeat(Math.max(0, n - s.length));
   const line = (a: string, b: string, c: string) => `${pad(a, wP)} | ${pad(b, wT)} | ${c}`;
   const table = [
     line("Person", "Task", "Metrics"),
-    `${"-".repeat(wP)}-+-${"-".repeat(wT)}-+-${"-".repeat(M_CAP)}`,
+    `${"-".repeat(wP)}-+-${"-".repeat(wT)}-+-${"-".repeat(wM)}`,
     ...rows.map((r) => line(r[0], r[1], r[2])),
   ].join("\n");
 
