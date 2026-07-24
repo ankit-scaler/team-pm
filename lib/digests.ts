@@ -83,7 +83,6 @@ export async function postCompletionDigest_range(opts: {
       channelId,
       title: `*${progLabel}*`,
       perPerson,
-      link: opts.appUrl ? `${opts.appUrl}/summary` : undefined,
     });
     if (didPost) posted++;
   }

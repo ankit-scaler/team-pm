@@ -304,7 +304,13 @@ export async function notifyDueSoon(items: OverdueItem[], appUrl?: string): Prom
 export async function postChannelMessage(channelId: string, text: string): Promise<boolean> {
   if (!botToken() || !channelId) return false;
   try {
-    const r = await slackApi("chat.postMessage", { channel: channelId, text, blocks: sectionBlocks(text) });
+    const r = await slackApi("chat.postMessage", {
+      channel: channelId,
+      text,
+      blocks: sectionBlocks(text),
+      unfurl_links: false,
+      unfurl_media: false,
+    });
     return !!r.ok;
   } catch (e) {
     console.error("Slack postChannelMessage failed:", e);
@@ -319,7 +325,6 @@ export async function postCompletionDigest(opts: {
   channelId: string;
   title: string;
   perPerson: { name: string; items: { title: string; metrics: string[] }[] }[];
-  link?: string;
 }): Promise<{ posted: boolean }> {
   if (!botToken() || !opts.channelId || opts.perPerson.length === 0) return { posted: false };
 
@@ -355,7 +360,9 @@ export async function postCompletionDigest(opts: {
     await slackApi("chat.postMessage", {
       channel: opts.channelId,
       text,
-      blocks: sectionBlocks(text, opts.link),
+      blocks: sectionBlocks(text),
+      unfurl_links: false,
+      unfurl_media: false,
     });
     return { posted: true };
   } catch (e) {
