@@ -60,6 +60,12 @@ export function TaskForm({
     e.preventDefault();
     setError(null);
     const fd = new FormData(e.currentTarget);
+    // Metrics is a custom picker (no native required), so guard it here for
+    // instant feedback instead of a server round-trip.
+    if (fd.getAll("metrics").filter(Boolean).length === 0) {
+      setError("Please add at least one metric.");
+      return;
+    }
     const action = isEdit ? updateTask.bind(null, task!.id) : createTask;
     startTransition(async () => {
       try {

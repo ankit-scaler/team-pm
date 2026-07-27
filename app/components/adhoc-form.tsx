@@ -50,6 +50,10 @@ export function AdhocForm({
     e.preventDefault();
     setError(null);
     const fd = new FormData(e.currentTarget);
+    if (fd.getAll("metrics").filter(Boolean).length === 0) {
+      setError("Please add at least one metric.");
+      return;
+    }
     const action = isEdit ? updateAdhocRequest.bind(null, request!.id) : createAdhocRequest;
     startTransition(async () => {
       try {
