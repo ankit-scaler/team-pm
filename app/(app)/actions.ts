@@ -362,7 +362,9 @@ async function logActivity(entry: LogEntry, actor?: { id: string; name: string }
 }
 
 // ── Required-field validation ─────────────────────────────────
-function requireFields(values: Record<string, unknown>, labels: Record<string, string>) {
+// Returns a user-facing message for any missing field, or null if all present.
+// (Returned — not thrown — so the message survives Next's production error redaction.)
+function requireFields(values: Record<string, unknown>, labels: Record<string, string>): string | null {
   const missing = Object.keys(labels).filter((k) => {
     const v = values[k];
     if (v == null) return true;
@@ -370,16 +372,14 @@ function requireFields(values: Record<string, unknown>, labels: Record<string, s
     if (Array.isArray(v)) return v.length === 0;
     return false;
   });
-  if (missing.length > 0) {
-    throw new Error(`Please fill: ${missing.map((k) => labels[k]).join(", ")}`);
-  }
+  return missing.length > 0 ? `Please fill: ${missing.map((k) => labels[k]).join(", ")}` : null;
 }
 
 // Tasks: everything required except Tags, Stakeholders, Effort (and links, which
-// are only forced at Delivered).
-function validateTaskForm(formData: FormData, metrics: string[]) {
+// are only forced at Delivered). Returns an error message or null.
+function validateTaskForm(formData: FormData, metrics: string[]): string | null {
   const etaTbd = formData.get("eta_tbd") === "on";
-  requireFields(
+  return requireFields(
     {
       title: str(formData.get("title")),
       assignee_id: str(formData.get("assignee_id")),
@@ -402,9 +402,9 @@ function validateTaskForm(formData: FormData, metrics: string[]) {
   );
 }
 
-// Adhoc: everything required except ETA (Slack link stays optional).
-function validateAdhocForm(formData: FormData, metrics: string[]) {
-  requireFields(
+// Adhoc: everything required except ETA (Slack link stays optional). Returns an error message or null.
+function validateAdhocForm(formData: FormData, metrics: string[]): string | null {
+  return requireFields(
     {
       program: str(formData.get("program")),
       batch: str(formData.get("batch")),
@@ -503,7 +503,8 @@ export async function createTask(formData: FormData) {
   const stakeholderIds = formData.getAll("stakeholders").map(String).filter(Boolean);
   const metrics = await sanitizeMetrics(parseMultiValue(formData, "metrics"));
   const tags = await sanitizeTags(parseMultiValue(formData, "tags"));
-  validateTaskForm(formData, metrics);
+  const vErr = validateTaskForm(formData, metrics);
+  if (vErr) return { error: vErr };
 
   const etaTbd = formData.get("eta_tbd") === "on";
   const eta = etaTbd ? null : str(formData.get("eta"));
@@ -608,7 +609,8 @@ export async function updateTask(taskId: string, formData: FormData) {
   const stakeholderIds = formData.getAll("stakeholders").map(String).filter(Boolean);
   const metrics = await sanitizeMetrics(parseMultiValue(formData, "metrics"));
   const tags = await sanitizeTags(parseMultiValue(formData, "tags"));
-  validateTaskForm(formData, metrics);
+  const vErr = validateTaskForm(formData, metrics);
+  if (vErr) return { error: vErr };
 
   const etaTbd = formData.get("eta_tbd") === "on";
   const newEta = etaTbd ? null : str(formData.get("eta"));
@@ -618,14 +620,18 @@ export async function updateTask(taskId: string, formData: FormData) {
     await assertCanMove(before.program ?? null, before.assignee_id ?? null);
   }
 
-  // Starting work requires a concrete ETA date (TBD isn't enough).
-  if (newStatus === "Working" && !newEta) {
-    throw new Error("Set an ETA (a real date) before moving a task to Working.");
+  // These only apply when TRANSITIONING into the status — not when editing a
+  // task that's already there (e.g. changing an already-Delivered task's date).
+  if (before && before.status !== "Working" && newStatus === "Working" && !newEta) {
+    return { error: "Set an ETA (a real date) before moving a task to Working." };
   }
-
-  // Delivering (Completed) requires both links, whichever path set the status.
-  if (newStatus === "Completed" && (!str(formData.get("slack_link")) || !str(formData.get("sheet_link")))) {
-    throw new Error("Add a Slack link and a Sheet link before marking a task Delivered.");
+  if (
+    before &&
+    before.status !== "Completed" &&
+    newStatus === "Completed" &&
+    (!str(formData.get("slack_link")) || !str(formData.get("sheet_link")))
+  ) {
+    return { error: "Add a Slack link and a Sheet link before marking a task Delivered." };
   }
 
   const { error } = await supabase
@@ -942,7 +948,8 @@ export async function createAdhocRequest(formData: FormData) {
   const moduleOwner = await nameForProfile(assigneeId); // keep text in sync with assignee
   const stakeholder = str(formData.get("stakeholder"));
   const metrics = await sanitizeMetrics(parseMultiValue(formData, "metrics"));
-  validateAdhocForm(formData, metrics);
+  const vErr = validateAdhocForm(formData, metrics);
+  if (vErr) return { error: vErr };
 
   const { data: created, error } = await supabase
     .from("adhoc_requests")
@@ -1033,7 +1040,8 @@ export async function updateAdhocRequest(id: string, formData: FormData) {
   const moduleOwner = await nameForProfile(assigneeId);
   const stakeholder = str(formData.get("stakeholder"));
   const metrics = await sanitizeMetrics(parseMultiValue(formData, "metrics"));
-  validateAdhocForm(formData, metrics);
+  const vErr = validateAdhocForm(formData, metrics);
+  if (vErr) return { error: vErr };
 
   const { error } = await supabase
     .from("adhoc_requests")

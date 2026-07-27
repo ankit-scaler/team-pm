@@ -53,7 +53,11 @@ export function AdhocForm({
     const action = isEdit ? updateAdhocRequest.bind(null, request!.id) : createAdhocRequest;
     startTransition(async () => {
       try {
-        await action(fd);
+        const res = await action(fd);
+        if (res?.error) {
+          setError(res.error);
+          return;
+        }
         setOpen(false);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Something went wrong");
