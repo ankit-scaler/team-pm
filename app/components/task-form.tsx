@@ -118,12 +118,11 @@ export function TaskForm({
       {open && (
         <div
           className="fixed inset-0 z-40 grid place-items-start overflow-y-auto bg-black/40 p-4 backdrop-blur-sm sm:place-items-center"
-          onMouseDown={() => setOpen(false)}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setOpen(false);
+          }}
         >
-          <div
-            className="relative w-full max-w-lg rounded-xl border border-border bg-surface p-5 shadow-xl"
-            onMouseDown={(e) => e.stopPropagation()}
-          >
+          <div className="relative w-full max-w-lg rounded-xl border border-border bg-surface p-5 shadow-xl">
             {pending && (
               <div className="absolute inset-0 z-10 grid place-items-center rounded-xl bg-surface/85 backdrop-blur-sm">
                 <Loader className="py-0" />
