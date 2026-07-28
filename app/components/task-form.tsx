@@ -39,6 +39,8 @@ export function TaskForm({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [etaTbd, setEtaTbd] = useState(task?.eta_tbd ?? false);
+  const [status, setStatus] = useState<string>(task?.status ?? "To pick");
+  const needsLinks = status === "Completed";
   const router = useRouter();
   const isEdit = Boolean(task);
 
@@ -64,6 +66,14 @@ export function TaskForm({
     // instant feedback instead of a server round-trip.
     if (fd.getAll("metrics").filter(Boolean).length === 0) {
       setError("Please add at least one metric.");
+      return;
+    }
+    // Delivering (Completed) needs both links — flag it here for instant feedback.
+    if (
+      fd.get("status") === "Completed" &&
+      (!String(fd.get("slack_link") ?? "").trim() || !String(fd.get("sheet_link") ?? "").trim())
+    ) {
+      setError("Add a Slack link and a Sheet link to mark a task as Completed.");
       return;
     }
     const action = isEdit ? updateTask.bind(null, task!.id) : createTask;
@@ -177,7 +187,12 @@ export function TaskForm({
                 </div>
                 <div>
                   <label className={labelCls}>Status</label>
-                  <select name="status" defaultValue={task?.status ?? "To pick"} className={fieldCls}>
+                  <select
+                    name="status"
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value)}
+                    className={fieldCls}
+                  >
                     {STATUSES.map((s) => (
                       <option key={s} value={s}>
                         {s}
@@ -305,7 +320,9 @@ export function TaskForm({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className={labelCls}>Slack link (optional)</label>
+                  <label className={labelCls}>
+                    Slack link{needsLinks ? <Req /> : " (optional)"}
+                  </label>
                   <input
                     type="url"
                     name="slack_link"
@@ -315,7 +332,9 @@ export function TaskForm({
                   />
                 </div>
                 <div>
-                  <label className={labelCls}>Relevant sheet (optional)</label>
+                  <label className={labelCls}>
+                    Relevant sheet{needsLinks ? <Req /> : " (optional)"}
+                  </label>
                   <input
                     type="url"
                     name="sheet_link"

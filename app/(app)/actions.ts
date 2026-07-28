@@ -505,6 +505,10 @@ export async function createTask(formData: FormData) {
   const tags = await sanitizeTags(parseMultiValue(formData, "tags"));
   const vErr = validateTaskForm(formData, metrics);
   if (vErr) return { error: vErr };
+  // Creating a task straight into Completed needs both links (matches the move rule).
+  if (status === "Completed" && (!str(formData.get("slack_link")) || !str(formData.get("sheet_link")))) {
+    return { error: "Add a Slack link and a Sheet link to mark a task as Completed." };
+  }
 
   const etaTbd = formData.get("eta_tbd") === "on";
   const eta = etaTbd ? null : str(formData.get("eta"));
