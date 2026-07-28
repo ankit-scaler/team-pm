@@ -14,7 +14,7 @@ const ACTION_STYLE: Record<string, string> = {
   deleted: "border-red-300 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300",
 };
 
-const ENTITY_TYPES = ["task", "adhoc", "kr", "metric", "tag", "effort", "priority", "program", "track", "membership", "role", "user"];
+const ENTITY_TYPES = ["task", "adhoc", "kr", "metric", "tag", "effort", "priority", "program", "track", "impact", "membership", "role", "user"];
 const ACTIONS = ["created", "updated", "moved", "deleted"];
 
 function fmtWhen(iso: string) {

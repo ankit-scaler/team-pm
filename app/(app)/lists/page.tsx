@@ -7,6 +7,7 @@ import {
   getTags,
   getEfforts,
   getPriorities,
+  getImpactStatuses,
 } from "@/lib/queries";
 import { RegistryAdmin } from "../../components/registry-admin";
 
@@ -16,13 +17,14 @@ export default async function ListsPage() {
   const access = await getMyAccess();
   if (!access.isAdmin) redirect("/board");
 
-  const [programs, tracks, metrics, tags, efforts, priorities] = await Promise.all([
+  const [programs, tracks, metrics, tags, efforts, priorities, impactStatuses] = await Promise.all([
     getPrograms(),
     getTracks(),
     getMetricNames(),
     getTags(),
     getEfforts(),
     getPriorities(),
+    getImpactStatuses(),
   ]);
 
   return (
@@ -41,6 +43,7 @@ export default async function ListsPage() {
         tags={tags}
         efforts={efforts}
         priorities={priorities}
+        impactStatuses={impactStatuses}
       />
     </div>
   );

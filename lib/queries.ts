@@ -1,6 +1,6 @@
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { getMyAccess } from "@/lib/access";
-import { DEFAULT_METRICS, PROGRAMS, TRACKS, EFFORTS, PRIORITIES, type AdhocRequest, type Profile, type Task } from "@/lib/types";
+import { DEFAULT_METRICS, PROGRAMS, TRACKS, EFFORTS, PRIORITIES, IMPACT_STATUS_DEFAULTS, type AdhocRequest, type ImpactRow, type Profile, type Task } from "@/lib/types";
 import { DEFAULT_KRS, type KR } from "@/lib/kr-defaults";
 
 export type MembershipRow = { profile_id: string; program: string; role: "mo" | "user" };
@@ -198,6 +198,70 @@ export async function getTags(): Promise<string[]> {
   if (error || !data) return [];
   return data.map((r: any) => r.name as string);
 }
+export async function getImpactStatuses(): Promise<string[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase.from("impact_statuses").select("name").order("position");
+  if (error || !data) return [...IMPACT_STATUS_DEFAULTS];
+  return data.map((r: any) => r.name as string);
+}
+
+// Impact rows = every metric on every COMPLETED task, merged with any saved
+// impact record. Read-scoped like tasks (non-admins: their programs + null).
+export async function getImpactRows(): Promise<ImpactRow[]> {
+  const supabase = createClient();
+  const access = await getMyAccess();
+
+  let tq = supabase
+    .from("tasks")
+    .select(
+      `id, title, description, program, delivered_date, metrics,
+       assignee:profiles!tasks_assignee_id_fkey (${PROFILE_COLS}),
+       task_stakeholders ( profile:profiles!task_stakeholders_profile_id_fkey (${PROFILE_COLS}) )`
+    )
+    .eq("status", "Completed")
+    .order("delivered_date", { ascending: false });
+  tq = scopeByProgram(tq, access);
+
+  const [{ data: tasks }, { data: impacts }] = await Promise.all([
+    tq,
+    supabase.from("metric_impacts").select("*"),
+  ]);
+
+  const impactMap = new Map<string, any>();
+  for (const r of impacts ?? []) impactMap.set(`${(r as any).task_id}::${(r as any).metric}`, r);
+
+  const rows: ImpactRow[] = [];
+  for (const t of (tasks ?? []) as any[]) {
+    const stakeholders = (t.task_stakeholders ?? [])
+      .map((s: any) => s.profile?.full_name ?? s.profile?.email)
+      .filter(Boolean) as string[];
+    for (const metric of (t.metrics ?? []) as string[]) {
+      const r = impactMap.get(`${t.id}::${metric}`);
+      rows.push({
+        taskId: t.id,
+        metric,
+        assignee: t.assignee?.full_name ?? t.assignee?.email ?? null,
+        taskTitle: t.title,
+        description: t.description,
+        program: t.program ?? null,
+        deliveredDate: t.delivered_date ?? null,
+        stakeholders,
+        metricType: r?.metric_type ?? null,
+        preLabel: r?.pre_label ?? null,
+        preValue: r?.pre_value ?? null,
+        preDesc: r?.pre_desc ?? null,
+        preUpdatedAt: r?.pre_updated_at ?? null,
+        postLabel: r?.post_label ?? null,
+        postValue: r?.post_value ?? null,
+        postDesc: r?.post_desc ?? null,
+        postUpdatedAt: r?.post_updated_at ?? null,
+        status: r?.status ?? null,
+      });
+    }
+  }
+  return rows;
+}
+
 export async function getEfforts(): Promise<string[]> {
   const supabase = createClient();
   const { data, error } = await supabase.from("efforts").select("name").order("position");

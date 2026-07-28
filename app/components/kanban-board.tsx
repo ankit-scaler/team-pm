@@ -96,6 +96,9 @@ export function KanbanBoard({
   const [tag, setTag] = useState("");
   const [month, setMonth] = useState(""); // YYYY-MM, matched against ETA
   const [q, setQ] = useState("");
+  const [stakeholder, setStakeholder] = useState(""); // display name, matched against task stakeholders / adhoc stakeholder
+  const [program, setProgram] = useState(""); // admin-only
+  const [metric, setMetric] = useState("");
 
   // Clear the per-card spinner once the move's server action settles.
   useEffect(() => {
@@ -122,10 +125,17 @@ export function KanbanBoard({
         return false;
       if (tag && !t.tags.includes(tag)) return false;
       if (month && (!t.eta || !t.eta.startsWith(month))) return false;
+      if (
+        stakeholder &&
+        !(t.stakeholders ?? []).some((s) => (s.full_name ?? s.email) === stakeholder)
+      )
+        return false;
+      if (isAdmin && program && t.program !== program) return false;
+      if (metric && !(t.metrics ?? []).includes(metric)) return false;
       if (q && !t.title.toLowerCase().includes(q.toLowerCase())) return false;
       return true;
     });
-  }, [tasks, assignee, tag, month, q]);
+  }, [tasks, assignee, tag, month, q, stakeholder, program, metric, isAdmin]);
 
   // Adhoc requests appear on the board too, in their status column. They have no
   // tags, so the tag filter hides them; the person filter matches their assignee.
@@ -135,6 +145,9 @@ export function KanbanBoard({
       if (assignee === "unassigned" ? a.assignee_id : assignee && a.assignee_id !== assignee)
         return false;
       if (month && (!a.eta || !a.eta.startsWith(month))) return false;
+      if (stakeholder && a.stakeholder !== stakeholder) return false;
+      if (isAdmin && program && a.program !== program) return false;
+      if (metric && !(a.metrics ?? []).includes(metric)) return false;
       if (q) {
         const hay = [a.title, a.module, a.program, a.raised_by, a.assignee?.full_name, a.assignee?.email]
           .filter(Boolean)
@@ -144,9 +157,35 @@ export function KanbanBoard({
       }
       return true;
     });
-  }, [adhocRequests, assignee, tag, month, q]);
+  }, [adhocRequests, assignee, tag, month, q, stakeholder, program, metric, isAdmin]);
 
-  const anyFilter = assignee || tag || month || q;
+  const anyFilter = assignee || tag || month || q || stakeholder || (isAdmin && program) || metric;
+
+  // Distinct stakeholder names across tasks (Profile names) + adhoc (free text).
+  const stakeholderOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const t of tasks)
+      for (const s of t.stakeholders ?? []) {
+        const name = s.full_name ?? s.email;
+        if (name) set.add(name);
+      }
+    for (const a of adhocRequests) if (a.stakeholder) set.add(a.stakeholder);
+    return Array.from(set).sort((x, y) => x.localeCompare(y));
+  }, [tasks, adhocRequests]);
+
+  // Distinct programs (admin filter) and metrics across tasks + adhoc.
+  const programOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const t of tasks) if (t.program) set.add(t.program);
+    for (const a of adhocRequests) if (a.program) set.add(a.program);
+    return Array.from(set).sort((x, y) => x.localeCompare(y));
+  }, [tasks, adhocRequests]);
+  const metricOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const t of tasks) for (const m of t.metrics ?? []) set.add(m);
+    for (const a of adhocRequests) for (const m of a.metrics ?? []) set.add(m);
+    return Array.from(set).sort((x, y) => x.localeCompare(y));
+  }, [tasks, adhocRequests]);
 
   // Distinct ETA months across tasks + adhoc, newest first.
   const monthOptions = useMemo(() => {
@@ -215,6 +254,45 @@ export function KanbanBoard({
             <option key={m} value={m}>{fmtMonth(m)}</option>
           ))}
         </select>
+        {stakeholderOptions.length > 0 && (
+          <select
+            value={stakeholder}
+            onChange={(e) => setStakeholder(e.target.value)}
+            title="Filter by stakeholder"
+            className={selCls}
+          >
+            <option value="">All stakeholders</option>
+            {stakeholderOptions.map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+        )}
+        {isAdmin && programOptions.length > 0 && (
+          <select
+            value={program}
+            onChange={(e) => setProgram(e.target.value)}
+            title="Filter by program"
+            className={selCls}
+          >
+            <option value="">All programs</option>
+            {programOptions.map((p) => (
+              <option key={p} value={p}>{p}</option>
+            ))}
+          </select>
+        )}
+        {metricOptions.length > 0 && (
+          <select
+            value={metric}
+            onChange={(e) => setMetric(e.target.value)}
+            title="Filter by metric"
+            className={selCls}
+          >
+            <option value="">All metrics</option>
+            {metricOptions.map((m) => (
+              <option key={m} value={m}>{m}</option>
+            ))}
+          </select>
+        )}
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
@@ -229,6 +307,9 @@ export function KanbanBoard({
               setTag("");
               setMonth("");
               setQ("");
+              setStakeholder("");
+              setProgram("");
+              setMetric("");
             }}
             className="text-xs text-accent hover:underline"
           >
