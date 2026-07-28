@@ -39,6 +39,8 @@ export function TaskForm({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [etaTbd, setEtaTbd] = useState(task?.eta_tbd ?? false);
+  const [status, setStatus] = useState<string>(task?.status ?? "To pick");
+  const needsLinks = status === "Completed";
   const router = useRouter();
   const isEdit = Boolean(task);
 
@@ -60,10 +62,28 @@ export function TaskForm({
     e.preventDefault();
     setError(null);
     const fd = new FormData(e.currentTarget);
+    // Metrics is a custom picker (no native required), so guard it here for
+    // instant feedback instead of a server round-trip.
+    if (fd.getAll("metrics").filter(Boolean).length === 0) {
+      setError("Please add at least one metric.");
+      return;
+    }
+    // Delivering (Completed) needs both links — flag it here for instant feedback.
+    if (
+      fd.get("status") === "Completed" &&
+      (!String(fd.get("slack_link") ?? "").trim() || !String(fd.get("sheet_link") ?? "").trim())
+    ) {
+      setError("Add a Slack link and a Sheet link to mark a task as Completed.");
+      return;
+    }
     const action = isEdit ? updateTask.bind(null, task!.id) : createTask;
     startTransition(async () => {
       try {
-        await action(fd);
+        const res = await action(fd);
+        if (res?.error) {
+          setError(res.error);
+          return;
+        }
         setOpen(false);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Something went wrong");
@@ -108,12 +128,11 @@ export function TaskForm({
       {open && (
         <div
           className="fixed inset-0 z-40 grid place-items-start overflow-y-auto bg-black/40 p-4 backdrop-blur-sm sm:place-items-center"
-          onMouseDown={() => setOpen(false)}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setOpen(false);
+          }}
         >
-          <div
-            className="relative w-full max-w-lg rounded-xl border border-border bg-surface p-5 shadow-xl"
-            onMouseDown={(e) => e.stopPropagation()}
-          >
+          <div className="relative w-full max-w-lg rounded-xl border border-border bg-surface p-5 shadow-xl">
             {pending && (
               <div className="absolute inset-0 z-10 grid place-items-center rounded-xl bg-surface/85 backdrop-blur-sm">
                 <Loader className="py-0" />
@@ -168,7 +187,12 @@ export function TaskForm({
                 </div>
                 <div>
                   <label className={labelCls}>Status</label>
-                  <select name="status" defaultValue={task?.status ?? "To pick"} className={fieldCls}>
+                  <select
+                    name="status"
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value)}
+                    className={fieldCls}
+                  >
                     {STATUSES.map((s) => (
                       <option key={s} value={s}>
                         {s}
@@ -296,7 +320,9 @@ export function TaskForm({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className={labelCls}>Slack link (optional)</label>
+                  <label className={labelCls}>
+                    Slack link{needsLinks ? <Req /> : " (optional)"}
+                  </label>
                   <input
                     type="url"
                     name="slack_link"
@@ -306,7 +332,9 @@ export function TaskForm({
                   />
                 </div>
                 <div>
-                  <label className={labelCls}>Relevant sheet (optional)</label>
+                  <label className={labelCls}>
+                    Relevant sheet{needsLinks ? <Req /> : " (optional)"}
+                  </label>
                   <input
                     type="url"
                     name="sheet_link"

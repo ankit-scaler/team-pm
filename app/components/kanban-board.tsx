@@ -488,12 +488,11 @@ function SetEtaDialog({ task, onClose }: { task: Task; onClose: () => void }) {
   return (
     <div
       className="fixed inset-0 z-40 grid place-items-center overflow-y-auto bg-black/40 p-4 backdrop-blur-sm"
-      onMouseDown={onClose}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
-      <div
-        className="relative w-full max-w-md rounded-xl border border-border bg-surface p-5 shadow-xl"
-        onMouseDown={(e) => e.stopPropagation()}
-      >
+      <div className="relative w-full max-w-md rounded-xl border border-border bg-surface p-5 shadow-xl">
         <h2 className="text-base font-semibold">Set an ETA to start</h2>
         <p className="mt-1 text-sm text-muted">
           <span className="font-medium text-fg/80">{task.title}</span> needs a real ETA date before
@@ -570,12 +569,11 @@ function DeliverDialog({ task, onClose }: { task: Task; onClose: () => void }) {
   return (
     <div
       className="fixed inset-0 z-40 grid place-items-center overflow-y-auto bg-black/40 p-4 backdrop-blur-sm"
-      onMouseDown={onClose}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
-      <div
-        className="relative w-full max-w-md rounded-xl border border-border bg-surface p-5 shadow-xl"
-        onMouseDown={(e) => e.stopPropagation()}
-      >
+      <div className="relative w-full max-w-md rounded-xl border border-border bg-surface p-5 shadow-xl">
         <h2 className="text-base font-semibold">Deliver task</h2>
         <p className="mt-1 text-sm text-muted">
           Add the Slack link and Sheet link before marking{" "}

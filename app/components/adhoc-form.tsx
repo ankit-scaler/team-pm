@@ -50,10 +50,18 @@ export function AdhocForm({
     e.preventDefault();
     setError(null);
     const fd = new FormData(e.currentTarget);
+    if (fd.getAll("metrics").filter(Boolean).length === 0) {
+      setError("Please add at least one metric.");
+      return;
+    }
     const action = isEdit ? updateAdhocRequest.bind(null, request!.id) : createAdhocRequest;
     startTransition(async () => {
       try {
-        await action(fd);
+        const res = await action(fd);
+        if (res?.error) {
+          setError(res.error);
+          return;
+        }
         setOpen(false);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Something went wrong");
@@ -93,12 +101,11 @@ export function AdhocForm({
       {open && (
         <div
           className="fixed inset-0 z-40 grid place-items-start overflow-y-auto bg-black/40 p-4 backdrop-blur-sm sm:place-items-center"
-          onMouseDown={() => setOpen(false)}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setOpen(false);
+          }}
         >
-          <div
-            className="relative w-full max-w-lg rounded-xl border border-border bg-surface p-5 shadow-xl"
-            onMouseDown={(e) => e.stopPropagation()}
-          >
+          <div className="relative w-full max-w-lg rounded-xl border border-border bg-surface p-5 shadow-xl">
             {pending && (
               <div className="absolute inset-0 z-10 grid place-items-center rounded-xl bg-surface/85 backdrop-blur-sm">
                 <Loader className="py-0" />
