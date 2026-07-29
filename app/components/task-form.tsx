@@ -68,6 +68,14 @@ export function TaskForm({
       setError("Please add at least one metric.");
       return;
     }
+    // ETA invariant: only "To pick" tasks may have no ETA — every other status
+    // needs a real date (not TBD / empty). Mirrors the server so creation and
+    // the edit form can't bypass it.
+    const noRealEta = fd.get("eta_tbd") === "on" || !String(fd.get("eta") ?? "").trim();
+    if (fd.get("status") !== "To pick" && noRealEta) {
+      setError("Set an ETA (a real date). Only 'To pick' tasks can have no ETA.");
+      return;
+    }
     // Delivering (Completed) needs both links — flag it here for instant feedback.
     if (
       fd.get("status") === "Completed" &&
