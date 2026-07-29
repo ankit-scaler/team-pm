@@ -18,6 +18,47 @@ export const DEFAULT_METRICS = [
   "PSP",
 ];
 
+// Metric impact classification (fixed — not admin-managed).
+export const METRIC_TYPES = ["Leading", "Lagging", "Non-Tangible"] as const;
+// Fallback impact-status options (the real list lives in the impact_statuses table).
+export const IMPACT_STATUS_DEFAULTS = ["Improved", "Regression", "Stable", "To be updated"];
+
+// A row on the Impact page: task info + its per-metric before/after impact.
+export type ImpactRow = {
+  taskId: string;
+  metric: string;
+  assignee: string | null;
+  taskTitle: string;
+  description: string | null;
+  program: string | null;
+  deliveredDate: string | null;
+  stakeholders: string[];
+  metricType: string | null;
+  preLabel: string | null;
+  preValue: string | null;
+  preDesc: string | null;
+  preUpdatedAt: string | null;
+  postLabel: string | null;
+  postValue: string | null;
+  postDesc: string | null;
+  postUpdatedAt: string | null;
+  status: string | null;
+};
+
+// Structured AI summary of the Impact table (returned by Gemini in JSON mode).
+// Organized by program: an overall line, then a section per program.
+export type AiSummaryItem = { title: string; detail: string };
+export type AiProgramSummary = {
+  program: string;
+  summary: string;
+  highlights: AiSummaryItem[];
+  watch: AiSummaryItem[];
+};
+export type AiImpactSummary = {
+  overview: string;
+  programs: AiProgramSummary[];
+};
+
 export const PROGRAMS = ["Academy", "DevOps", "AIML", "DSML"] as const;
 export type Program = (typeof PROGRAMS)[number];
 

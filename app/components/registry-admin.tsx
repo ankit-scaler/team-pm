@@ -10,6 +10,7 @@ import {
   createTag,
   createEffort,
   createPriority,
+  createImpactStatus,
 } from "../(app)/actions";
 
 // Admin-only: add new values to the lists that feed every picker in the app.
@@ -20,6 +21,7 @@ export function RegistryAdmin({
   tags,
   efforts,
   priorities,
+  impactStatuses,
 }: {
   programs: string[];
   tracks: string[];
@@ -27,6 +29,7 @@ export function RegistryAdmin({
   tags: string[];
   efforts: string[];
   priorities: string[];
+  impactStatuses: string[];
 }) {
   return (
     <div className="grid gap-4 sm:grid-cols-2">
@@ -36,6 +39,7 @@ export function RegistryAdmin({
       <Section title="Tags" singular="tag" items={tags} onAdd={createTag} />
       <Section title="Effort levels" singular="effort" items={efforts} onAdd={createEffort} />
       <Section title="Priorities" singular="priority" items={priorities} onAdd={createPriority} />
+      <Section title="Impact statuses" singular="status" items={impactStatuses} onAdd={createImpactStatus} />
     </div>
   );
 }

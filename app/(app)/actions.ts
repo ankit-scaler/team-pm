@@ -7,8 +7,9 @@ import { notifyStatusChange } from "@/lib/slack";
 import { syncTaskCalendarEvent, deleteTaskCalendarEvent } from "@/lib/google";
 import { getMyAccess } from "@/lib/access";
 import type { MembershipRole } from "@/lib/access";
-import { type Status } from "@/lib/types";
+import { type Status, type AiImpactSummary } from "@/lib/types";
 import { getMetricNames, getTags } from "@/lib/queries";
+import { geminiGenerate } from "@/lib/gemini";
 
 // Only admins may create NEW metrics. For non-admins, drop any submitted metric
 // that isn't already a known one (the default seed list or one already in use).
@@ -265,6 +266,103 @@ export async function createPriority(name: string) {
   await createOrdered("priorities", name, "priority");
 }
 
+// Admin-managed impact-status options (for the Impact page).
+export async function createImpactStatus(name: string) {
+  await requireAdmin();
+  const clean = (name ?? "").trim();
+  if (!clean) throw new Error("Status name is required");
+  const admin = createAdminClient();
+  const { data: last } = await admin
+    .from("impact_statuses")
+    .select("position")
+    .order("position", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const position = ((last?.position as number) ?? 0) + 10;
+  const { error } = await admin.from("impact_statuses").upsert({ name: clean, position }, { onConflict: "name" });
+  if (error) throw new Error(error.message);
+  await logActivity({ action: "created", entityType: "impact", entityLabel: clean, summary: `Created impact status "${clean}"` });
+  revalidatePath("/impact");
+  revalidatePath("/lists");
+  revalidatePath("/admin");
+}
+
+// Save a (task, metric) impact record. Editable by admins and MOs of the task's
+// program. Stamps pre/post timestamps only when that side actually changed.
+export async function upsertMetricImpact(input: {
+  taskId: string;
+  metric: string;
+  metricType?: string | null;
+  preLabel?: string | null;
+  preValue?: string | null;
+  preDesc?: string | null;
+  postLabel?: string | null;
+  postValue?: string | null;
+  postDesc?: string | null;
+  status?: string | null;
+}): Promise<{ error?: string } | void> {
+  const access = await getMyAccess();
+  const supabase = createClient();
+  const { data: task } = await supabase
+    .from("tasks")
+    .select("title, program")
+    .eq("id", input.taskId)
+    .single();
+  if (!task) return { error: "Task not found" };
+
+  const program = (task.program as string | null) ?? null;
+  const canEdit = access.isAdmin || (!!program && access.moPrograms.includes(program));
+  if (!canEdit) return { error: "Only an admin or a module owner of this program can edit impact." };
+
+  const admin = createAdminClient();
+  const { data: before } = await admin
+    .from("metric_impacts")
+    .select("*")
+    .eq("task_id", input.taskId)
+    .eq("metric", input.metric)
+    .maybeSingle();
+
+  const norm = (v?: string | null) => (v == null || v.trim() === "" ? null : v.trim());
+  const pre = { pre_label: norm(input.preLabel), pre_value: norm(input.preValue), pre_desc: norm(input.preDesc) };
+  const post = { post_label: norm(input.postLabel), post_value: norm(input.postValue), post_desc: norm(input.postDesc) };
+
+  const b = (before ?? {}) as any;
+  const preChanged =
+    b.pre_label !== pre.pre_label || b.pre_value !== pre.pre_value || b.pre_desc !== pre.pre_desc;
+  const postChanged =
+    b.post_label !== post.post_label || b.post_value !== post.post_value || b.post_desc !== post.post_desc;
+  const preHasContent = !!(pre.pre_label || pre.pre_value || pre.pre_desc);
+  const postHasContent = !!(post.post_label || post.post_value || post.post_desc);
+  const now = new Date().toISOString();
+
+  const { error } = await admin.from("metric_impacts").upsert(
+    {
+      task_id: input.taskId,
+      metric: input.metric,
+      metric_type: norm(input.metricType),
+      ...pre,
+      ...post,
+      status: norm(input.status),
+      pre_updated_at: preChanged && preHasContent ? now : b.pre_updated_at ?? null,
+      post_updated_at: postChanged && postHasContent ? now : b.post_updated_at ?? null,
+      updated_at: now,
+    },
+    { onConflict: "task_id,metric" }
+  );
+  if (error) return { error: error.message };
+
+  await logActivity({
+    action: "updated",
+    entityType: "impact",
+    entityId: input.taskId,
+    entityLabel: `${task.title} · ${input.metric}`,
+    summary: `Updated impact for "${task.title}" (${input.metric})`,
+    program,
+  });
+
+  revalidatePath("/impact");
+}
+
 // RBAC guard: a non-admin may only act within programs they belong to.
 async function assertProgramAllowed(program: string | null) {
   const access = await getMyAccess();
@@ -336,7 +434,7 @@ type LogEntry = {
   action: "created" | "updated" | "deleted" | "moved";
   entityType:
     | "task" | "adhoc" | "kr" | "metric" | "tag" | "effort" | "priority"
-    | "membership" | "role" | "user" | "program" | "track";
+    | "membership" | "role" | "user" | "program" | "track" | "impact";
   entityId?: string | null;
   entityLabel?: string | null;
   summary: string;
@@ -1323,4 +1421,139 @@ export async function setUserRole(userId: string, role: "member" | "admin") {
     summary: role === "admin" ? `Made ${who} an admin` : `Revoked admin from ${who}`,
   });
   revalidatePath("/admin");
+}
+
+// AI summary of the (already filtered) Impact table. The client sends a compact
+// snapshot of the visible rows; we build a prompt and call Gemini. Returns
+// { summary } or { error } (never throws, so production doesn't mask the message).
+export async function aiSummarizeImpact(input: {
+  filters: string[];
+  rows: {
+    task: string;
+    assignee: string | null;
+    program: string | null;
+    stakeholders: string[];
+    metric: string;
+    metricType: string | null;
+    pre: string;
+    post: string;
+    status: string;
+    note: string;
+  }[];
+}): Promise<{ summary?: AiImpactSummary; error?: string }> {
+  try {
+    await getMyAccess(); // ensure an authenticated session
+  } catch {
+    return { error: "You need to be signed in." };
+  }
+
+  if (!input.rows || input.rows.length === 0) {
+    return { error: "Nothing to summarize with the current filters." };
+  }
+
+  const scope =
+    input.filters.length > 0 ? `Filters applied: ${input.filters.join(", ")}.` : "Scope: all completed tasks with metrics.";
+
+  const data = input.rows
+    .map((r) => {
+      const parts = [
+        `- Task "${r.task}" (owner: ${r.assignee ?? "unassigned"})`,
+        `program: ${r.program ?? "unclassified"}`,
+        `stakeholders: ${r.stakeholders.length ? r.stakeholders.join(", ") : "none"}`,
+        `metric: ${r.metric}${r.metricType ? ` [${r.metricType}]` : ""}`,
+        `before: ${r.pre || "—"}`,
+        `after: ${r.post || "—"}`,
+        `status: ${r.status}`,
+      ];
+      if (r.note) parts.push(`note: ${r.note}`);
+      return parts.join(" | ");
+    })
+    .join("\n");
+
+  const prompt = `You are an analyst summarizing an education team's "metric impact" tracker. Each line below is one metric measured on a completed task, with its before value, after value, and an impact status (Improved / Regression / Stable / To be updated). A value of "—" or an empty value means it has not been recorded yet.
+
+${scope}
+
+Produce a structured summary for a team lead, ORGANIZED BY PROGRAM:
+- overview: 1-2 sentences across all programs — how many metrics have real before→after data and the general direction. If almost nothing is recorded yet, say so plainly.
+- programs: one entry for EACH distinct program in the data. For each program:
+  - program: the program name exactly as given (use "Unclassified" for items with no program).
+  - summary: 1-2 sentences summarizing that program's impact — what moved and the overall direction for this program specifically.
+  - highlights: the notable improvements/changes in this program that actually have values. "title" = metric and task (e.g. "Class Ratings — DSA Scripts"), "detail" = the before → after change and status, naming the owner and the stakeholder(s) it matters to.
+  - watch: regressions in this program (list each individually) plus AT MOST 3 of the most notable metrics still pending an after-value. Same title/detail shape; name the owner and explain what needs attention.
+
+Rules:
+- Cover every program present in the data — do not merge or skip any.
+- Do NOT list every pending metric one by one. Instead, state the pending count (e.g. "12 of 15 metrics still need an after-value") inside that program's "summary" sentence, and only surface a few notable pending ones in "watch".
+- Be specific and use the real numbers/values and real people/stakeholder names; do NOT invent any.
+- Refer to people and stakeholders by their names as given in the data.
+- If a program's highlights or watch has nothing to report, return an empty array for it.
+- Keep each detail to one or two tight sentences. No markdown symbols (#, *, backticks).
+
+Data (${input.rows.length} metric rows):
+${data}`;
+
+  const item = {
+    type: "OBJECT",
+    properties: { title: { type: "STRING" }, detail: { type: "STRING" } },
+    required: ["title", "detail"],
+  };
+  const schema = {
+    type: "OBJECT",
+    properties: {
+      overview: { type: "STRING" },
+      programs: {
+        type: "ARRAY",
+        items: {
+          type: "OBJECT",
+          properties: {
+            program: { type: "STRING" },
+            summary: { type: "STRING" },
+            highlights: { type: "ARRAY", items: item },
+            watch: { type: "ARRAY", items: item },
+          },
+          required: ["program", "summary", "highlights", "watch"],
+        },
+      },
+    },
+    required: ["overview", "programs"],
+  };
+
+  const res = await geminiGenerate(prompt, { schema });
+  if (res.error) return { error: res.error };
+
+  // Be forgiving: strip any ```json fences and slice to the outermost { ... }.
+  const raw = (res.text ?? "").trim();
+  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  let jsonStr = (fenced ? fenced[1] : raw).trim();
+  const first = jsonStr.indexOf("{");
+  const last = jsonStr.lastIndexOf("}");
+  if (first !== -1 && last > first) jsonStr = jsonStr.slice(first, last + 1);
+
+  try {
+    const parsed = JSON.parse(jsonStr) as AiImpactSummary;
+    const cleanItems = (arr: any) =>
+      Array.isArray(arr)
+        ? arr
+            .filter((x) => x && (x.title || x.detail))
+            .map((x) => ({ title: String(x.title ?? ""), detail: String(x.detail ?? "") }))
+        : [];
+    const programs = Array.isArray(parsed.programs)
+      ? parsed.programs.map((p: any) => ({
+          program: String(p?.program ?? "Unclassified"),
+          summary: typeof p?.summary === "string" ? p.summary : "",
+          highlights: cleanItems(p?.highlights),
+          watch: cleanItems(p?.watch),
+        }))
+      : [];
+    return {
+      summary: {
+        overview: typeof parsed.overview === "string" ? parsed.overview : "",
+        programs,
+      },
+    };
+  } catch {
+    console.error("aiSummarizeImpact: could not parse Gemini output:", raw.slice(0, 500));
+    return { error: "Couldn't parse the AI response. Please try again." };
+  }
 }

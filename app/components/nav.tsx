@@ -13,6 +13,7 @@ const BASE_LINKS = [
   { href: "/people", label: "People" },
   { href: "/krs", label: "KRs" },
   { href: "/adhoc", label: "Adhoc" },
+  { href: "/impact", label: "Impact" },
 ];
 
 export function Nav({
@@ -61,7 +62,7 @@ export function Nav({
             <span className="text-base font-extrabold tracking-tight text-accent">Scaler</span>
           )}
           <span className="hidden text-sm font-semibold tracking-tight text-muted sm:inline">
-            .
+            · Team PM
           </span>
         </Link>
 
