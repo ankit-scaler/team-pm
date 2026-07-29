@@ -603,13 +603,19 @@ export async function createTask(formData: FormData) {
   const tags = await sanitizeTags(parseMultiValue(formData, "tags"));
   const vErr = validateTaskForm(formData, metrics);
   if (vErr) return { error: vErr };
+
+  const etaTbd = formData.get("eta_tbd") === "on";
+  const eta = etaTbd ? null : str(formData.get("eta"));
+
+  // ETA invariant: only "To pick" tasks may have no ETA. Any other status needs
+  // a real date (not TBD / empty) — so it can't be bypassed at creation.
+  if (status !== "To pick" && !eta) {
+    return { error: "Set an ETA (a real date). Only 'To pick' tasks can have no ETA." };
+  }
   // Creating a task straight into Completed needs both links (matches the move rule).
   if (status === "Completed" && (!str(formData.get("slack_link")) || !str(formData.get("sheet_link")))) {
     return { error: "Add a Slack link and a Sheet link to mark a task as Completed." };
   }
-
-  const etaTbd = formData.get("eta_tbd") === "on";
-  const eta = etaTbd ? null : str(formData.get("eta"));
 
   const { data: task, error } = await supabase
     .from("tasks")
@@ -722,11 +728,13 @@ export async function updateTask(taskId: string, formData: FormData) {
     await assertCanMove(before.program ?? null, before.assignee_id ?? null);
   }
 
-  // These only apply when TRANSITIONING into the status — not when editing a
-  // task that's already there (e.g. changing an already-Delivered task's date).
-  if (before && before.status !== "Working" && newStatus === "Working" && !newEta) {
-    return { error: "Set an ETA (a real date) before moving a task to Working." };
+  // ETA invariant: any status other than "To pick" must have a real ETA (not
+  // TBD / empty). Enforced on every save so it can't be bypassed via the form.
+  if (newStatus !== "To pick" && !newEta) {
+    return { error: "Set an ETA (a real date). Only 'To pick' tasks can have no ETA." };
   }
+  // Delivering (Completed) needs both links — only when transitioning in, so
+  // editing an already-Completed task's date isn't blocked.
   if (
     before &&
     before.status !== "Completed" &&
