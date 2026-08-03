@@ -205,7 +205,7 @@ export function KanbanBoard({
       setStartingEta(task);
       return;
     }
-    // Delivering a task requires a Slack + Sheet link — collect them first.
+    // Delivering a task requires at least one link (Slack or Sheet) — collect it first.
     if (dir === 1 && next === "Completed") {
       setDelivering(task);
       return;
@@ -617,8 +617,8 @@ function SetEtaDialog({ task, onClose }: { task: Task; onClose: () => void }) {
   );
 }
 
-// Popup shown when a task is moved to Delivered (Completed). Requires a Slack
-// link and a Sheet link before the move goes through.
+// Popup shown when a task is moved to Delivered (Completed). Requires at least
+// one link (Slack or Sheet) before the move goes through.
 function DeliverDialog({ task, onClose }: { task: Task; onClose: () => void }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -632,8 +632,8 @@ function DeliverDialog({ task, onClose }: { task: Task; onClose: () => void }) {
   function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
-    if (!slack.trim() || !sheet.trim()) {
-      setError("Both a Slack link and a Sheet link are required.");
+    if (!slack.trim() && !sheet.trim()) {
+      setError("Add a Slack link or a Sheet link (at least one).");
       return;
     }
     startTransition(async () => {
@@ -657,7 +657,7 @@ function DeliverDialog({ task, onClose }: { task: Task; onClose: () => void }) {
       <div className="relative w-full max-w-md rounded-xl border border-border bg-surface p-5 shadow-xl">
         <h2 className="text-base font-semibold">Deliver task</h2>
         <p className="mt-1 text-sm text-muted">
-          Add the Slack link and Sheet link before marking{" "}
+          Add a Slack link or a Sheet link (at least one) before marking{" "}
           <span className="font-medium text-fg/80">{task.title}</span> as Delivered.
         </p>
 
@@ -666,7 +666,6 @@ function DeliverDialog({ task, onClose }: { task: Task; onClose: () => void }) {
             <label className="mb-1 block text-[12px] font-medium text-fg">Slack link</label>
             <input
               type="url"
-              required
               value={slack}
               onChange={(e) => setSlack(e.target.value)}
               placeholder="https://slack.com/…"
@@ -677,7 +676,6 @@ function DeliverDialog({ task, onClose }: { task: Task; onClose: () => void }) {
             <label className="mb-1 block text-[12px] font-medium text-fg">Sheet link</label>
             <input
               type="url"
-              required
               value={sheet}
               onChange={(e) => setSheet(e.target.value)}
               placeholder="https://docs.google.com/…"

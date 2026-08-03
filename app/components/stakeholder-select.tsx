@@ -30,7 +30,7 @@ export function StakeholderSelect({
           (p.full_name ?? "").toLowerCase().includes(q) ||
           p.email.toLowerCase().includes(q)
       )
-      .slice(0, 6);
+      .slice(0, 50);
   }, [people, selected, query]);
 
   function add(id: string) {
@@ -84,7 +84,7 @@ export function StakeholderSelect({
       </div>
 
       {open && matches.length > 0 && (
-        <ul className="absolute z-30 mt-1 w-full overflow-hidden rounded-lg border border-border bg-surface shadow-lg">
+        <ul className="absolute z-30 mt-1 max-h-60 w-full overflow-y-auto overscroll-contain rounded-lg border border-border bg-surface shadow-lg">
           {matches.map((p) => (
             <li key={p.id}>
               <button

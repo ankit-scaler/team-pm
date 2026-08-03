@@ -62,6 +62,18 @@ async function slackGet(method: string, params: Record<string, string | number>)
   return json;
 }
 
+// Public permalink for a message — used by the "create task from a Slack
+// message" shortcut so the resulting task can link back to the source message.
+export async function getMessagePermalink(channel: string, messageTs: string): Promise<string | null> {
+  if (!botToken() || !channel || !messageTs) return null;
+  try {
+    const r = await slackGet("chat.getPermalink", { channel, message_ts: messageTs });
+    return (r?.permalink as string) ?? null;
+  } catch {
+    return null;
+  }
+}
+
 async function getChannelMembers(channel: string): Promise<Member[]> {
   if (membersCache && membersCache.channel === channel && Date.now() - membersCache.at < MEMBERS_TTL) {
     return membersCache.members;
