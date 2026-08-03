@@ -11,6 +11,10 @@
     {
       "path": "/api/digests/weekend",
       "schedule": "30 3 * * 1"
+    },
+    {
+      "path": "/api/reminders/due-today",
+      "schedule": "0 4 * * *"
     }
   ]
 }
