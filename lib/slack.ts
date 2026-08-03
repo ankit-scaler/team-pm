@@ -74,6 +74,27 @@ export async function getMessagePermalink(channel: string, messageTs: string): P
   }
 }
 
+// Send a direct message to a user identified by email. Resolves the Slack user
+// via users.lookupByEmail, then posts to them. Best-effort (never throws).
+// Requires the bot to have the users:read.email + chat:write scopes.
+export async function dmUserByEmail(email: string, text: string): Promise<boolean> {
+  if (!botToken() || !email) return false;
+  try {
+    const lookup = await slackGet("users.lookupByEmail", { email });
+    const userId = lookup?.user?.id as string | undefined;
+    if (!userId) return false;
+    const res = await slackApi("chat.postMessage", {
+      channel: userId,
+      text,
+      unfurl_links: false,
+      unfurl_media: false,
+    });
+    return Boolean(res?.ok);
+  } catch {
+    return false;
+  }
+}
+
 async function getChannelMembers(channel: string): Promise<Member[]> {
   if (membersCache && membersCache.channel === channel && Date.now() - membersCache.at < MEMBERS_TTL) {
     return membersCache.members;
