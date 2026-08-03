@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Pencil, Plus, Trash2, X } from "lucide-react";
 import { createTask, updateTask, deleteTask, deleteMetric } from "../(app)/actions";
@@ -43,6 +43,22 @@ export function TaskForm({
   const needsLinks = status === "Completed";
   const router = useRouter();
   const isEdit = Boolean(task);
+  const [prefill, setPrefill] = useState<{ title?: string; description?: string; slackLink?: string }>({});
+
+  // Prefill + auto-open the New-task form from URL params — e.g. a link shared
+  // from Slack: /tasks?description=…&slack_link=…. Runs once, then strips the
+  // query so a refresh doesn't reopen it.
+  useEffect(() => {
+    if (isEdit) return;
+    const params = new URLSearchParams(window.location.search);
+    const description = params.get("description") ?? undefined;
+    const title = params.get("title") ?? undefined;
+    const slackLink = params.get("slack_link") ?? undefined;
+    if (!description && !title && !slackLink) return;
+    setPrefill({ title, description, slackLink });
+    setOpen(true);
+    window.history.replaceState(null, "", window.location.pathname);
+  }, [isEdit]);
 
   function onDeleteMetric(name: string) {
     if (!confirm(`Delete the metric “${name}” everywhere?\nIt will be removed from every task and adhoc request.`))
@@ -76,12 +92,13 @@ export function TaskForm({
       setError("Set an ETA (a real date). Only 'To pick' tasks can have no ETA.");
       return;
     }
-    // Delivering (Completed) needs both links — flag it here for instant feedback.
+    // Delivering (Completed) needs at least one link — Slack or Sheet.
     if (
       fd.get("status") === "Completed" &&
-      (!String(fd.get("slack_link") ?? "").trim() || !String(fd.get("sheet_link") ?? "").trim())
+      !String(fd.get("slack_link") ?? "").trim() &&
+      !String(fd.get("sheet_link") ?? "").trim()
     ) {
-      setError("Add a Slack link and a Sheet link to mark a task as Completed.");
+      setError("Add a Slack link or a Sheet link (at least one) to mark a task as Completed.");
       return;
     }
     const action = isEdit ? updateTask.bind(null, task!.id) : createTask;
@@ -164,7 +181,7 @@ export function TaskForm({
                 <input
                   name="title"
                   required
-                  defaultValue={task?.title ?? ""}
+                  defaultValue={task?.title ?? prefill.title ?? ""}
                   placeholder="What needs doing?"
                   className={fieldCls}
                 />
@@ -175,7 +192,7 @@ export function TaskForm({
                 <textarea
                   name="description"
                   rows={3}
-                  defaultValue={task?.description ?? ""}
+                  defaultValue={task?.description ?? prefill.description ?? ""}
                   placeholder="Context, links, acceptance criteria…"
                   className={fieldCls}
                 />
@@ -329,19 +346,19 @@ export function TaskForm({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className={labelCls}>
-                    Slack link{needsLinks ? <Req /> : " (optional)"}
+                    Slack link{needsLinks ? <span className="ml-1 font-normal normal-case text-muted">(add either one)</span> : " (optional)"}
                   </label>
                   <input
                     type="url"
                     name="slack_link"
-                    defaultValue={task?.slack_link ?? ""}
+                    defaultValue={task?.slack_link ?? prefill.slackLink ?? ""}
                     placeholder="https://slack.com/…"
                     className={fieldCls}
                   />
                 </div>
                 <div>
                   <label className={labelCls}>
-                    Relevant sheet{needsLinks ? <Req /> : " (optional)"}
+                    Relevant sheet{needsLinks ? <span className="ml-1 font-normal normal-case text-muted">(add either one)</span> : " (optional)"}
                   </label>
                   <input
                     type="url"

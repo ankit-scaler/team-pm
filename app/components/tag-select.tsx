@@ -37,7 +37,7 @@ export function TagSelect({
     return suggestions
       .filter((t) => !selected.includes(t))
       .filter((t) => !ql || t.toLowerCase().includes(ql))
-      .slice(0, 6);
+      .slice(0, 50);
   }, [suggestions, selected, q]);
 
   const canCreate =
@@ -108,7 +108,7 @@ export function TagSelect({
       </div>
 
       {open && (matches.length > 0 || canCreate) && (
-        <ul className="absolute z-30 mt-1 w-full overflow-hidden rounded-lg border border-border bg-surface shadow-lg">
+        <ul className="absolute z-30 mt-1 max-h-60 w-full overflow-y-auto overscroll-contain rounded-lg border border-border bg-surface shadow-lg">
           {matches.map((t) => (
             <li key={t} className="flex items-center">
               <button

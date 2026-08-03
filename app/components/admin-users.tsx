@@ -5,7 +5,7 @@ import { Trash2, X } from "lucide-react";
 import {
   deleteUser,
   setUserRole,
-  setMembership,
+  setMemberships,
   removeMembership,
 } from "../(app)/actions";
 import type { Profile } from "@/lib/types";
@@ -118,7 +118,7 @@ export function AdminUsers({
                             programs={available}
                             allowMO={isAdmin}
                             disabled={pending}
-                            onAdd={(program, role) => run(() => setMembership(u.id, program, role))}
+                            onAdd={(programs, role) => run(() => setMemberships(u.id, programs, role))}
                           />
                         )}
                       </div>
@@ -173,6 +173,8 @@ export function AdminUsers({
   );
 }
 
+// Grant one user access to several programs at once. Pick a role (admins only)
+// and check any number of programs, then Add.
 function AddMembership({
   programs,
   allowMO,
@@ -182,37 +184,94 @@ function AddMembership({
   programs: string[];
   allowMO: boolean;
   disabled: boolean;
-  onAdd: (program: string, role: "mo" | "user") => void;
+  onAdd: (programs: string[], role: "mo" | "user") => void;
 }) {
-  const [program, setProgram] = useState("");
+  const [open, setOpen] = useState(false);
+  const [picked, setPicked] = useState<string[]>([]);
   const [role, setRole] = useState<"mo" | "user">("user");
+
+  const allSelected = programs.length > 0 && picked.length === programs.length;
+  const toggle = (p: string) =>
+    setPicked((s) => (s.includes(p) ? s.filter((x) => x !== p) : [...s, p]));
+
+  function close() {
+    setOpen(false);
+    setPicked([]);
+    setRole("user");
+  }
+  function submit() {
+    if (picked.length === 0) return;
+    onAdd(picked, role);
+    close();
+  }
+
   const cls = "rounded-md border border-border bg-surface px-1.5 py-1 text-[11px] outline-none";
   return (
-    <span className="inline-flex items-center gap-1">
-      <select value={program} onChange={(e) => setProgram(e.target.value)} className={cls}>
-        <option value="">+ program…</option>
-        {programs.map((p) => (
-          <option key={p} value={p}>{p}</option>
-        ))}
-      </select>
-      {allowMO && (
-        <select value={role} onChange={(e) => setRole(e.target.value as "mo" | "user")} className={cls}>
-          <option value="user">User</option>
-          <option value="mo">MO</option>
-        </select>
-      )}
+    <span className="relative inline-block">
       <button
         type="button"
-        disabled={!program || disabled}
-        onClick={() => {
-          onAdd(program, role);
-          setProgram("");
-          setRole("user");
-        }}
-        className="rounded-md bg-accent px-2 py-1 text-[11px] font-semibold text-white disabled:opacity-40"
+        onClick={() => (open ? close() : setOpen(true))}
+        className="rounded-md border border-dashed border-border px-2 py-0.5 text-[11px] font-medium text-muted transition-colors hover:border-accent hover:text-accent"
       >
-        Add
+        + Add programs
       </button>
+
+      {open && (
+        <div className="absolute left-0 top-full z-30 mt-1 w-56 rounded-lg border border-border bg-surface p-2 shadow-lg">
+          {allowMO && (
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <span className="text-[11px] text-muted">Access</span>
+              <select
+                value={role}
+                onChange={(e) => setRole(e.target.value as "mo" | "user")}
+                className={cls}
+              >
+                <option value="user">User</option>
+                <option value="mo">MO</option>
+              </select>
+            </div>
+          )}
+
+          <label className="mb-1 flex items-center gap-2 border-b border-border pb-1.5 text-[11px] font-medium text-fg/70">
+            <input
+              type="checkbox"
+              checked={allSelected}
+              onChange={() => setPicked(allSelected ? [] : [...programs])}
+            />
+            Select all
+          </label>
+
+          <div className="max-h-44 space-y-0.5 overflow-y-auto py-1">
+            {programs.map((p) => (
+              <label
+                key={p}
+                className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 text-xs hover:bg-bg"
+              >
+                <input type="checkbox" checked={picked.includes(p)} onChange={() => toggle(p)} />
+                {p}
+              </label>
+            ))}
+          </div>
+
+          <div className="mt-2 flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={close}
+              className="text-[11px] text-muted hover:text-fg"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={picked.length === 0 || disabled}
+              onClick={submit}
+              className="rounded-md bg-accent px-2 py-1 text-[11px] font-semibold text-white disabled:opacity-40"
+            >
+              Add{picked.length > 0 ? ` (${picked.length})` : ""}
+            </button>
+          </div>
+        </div>
+      )}
     </span>
   );
 }

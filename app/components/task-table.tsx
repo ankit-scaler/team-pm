@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { MessageSquare, FileSpreadsheet } from "lucide-react";
 import { TaskForm } from "./task-form";
+import { ExportCompleted } from "./export-completed";
 import { StatusBadge, PriorityLabel, EffortChip } from "./status-badge";
 import { STATUSES, type Profile, type Task } from "@/lib/types";
 
@@ -172,7 +173,10 @@ export function TaskTable({
             Clear filters
           </button>
         )}
-        <span className="ml-auto text-xs text-muted">{filtered.length} of {tasks.length}</span>
+        <div className="ml-auto flex items-center gap-3">
+          <ExportCompleted tasks={filtered} />
+          <span className="text-xs text-muted">{filtered.length} of {tasks.length}</span>
+        </div>
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-border bg-surface">

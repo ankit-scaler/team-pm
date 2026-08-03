@@ -603,7 +603,6 @@ export async function createTask(formData: FormData) {
   const tags = await sanitizeTags(parseMultiValue(formData, "tags"));
   const vErr = validateTaskForm(formData, metrics);
   if (vErr) return { error: vErr };
-
   const etaTbd = formData.get("eta_tbd") === "on";
   const eta = etaTbd ? null : str(formData.get("eta"));
 
@@ -612,9 +611,9 @@ export async function createTask(formData: FormData) {
   if (status !== "To pick" && !eta) {
     return { error: "Set an ETA (a real date). Only 'To pick' tasks can have no ETA." };
   }
-  // Creating a task straight into Completed needs both links (matches the move rule).
-  if (status === "Completed" && (!str(formData.get("slack_link")) || !str(formData.get("sheet_link")))) {
-    return { error: "Add a Slack link and a Sheet link to mark a task as Completed." };
+  // Creating a task straight into Completed needs at least one link (matches the move rule).
+  if (status === "Completed" && !str(formData.get("slack_link")) && !str(formData.get("sheet_link"))) {
+    return { error: "Add a Slack link or a Sheet link (at least one) to mark a task as Completed." };
   }
 
   const { data: task, error } = await supabase
@@ -739,9 +738,10 @@ export async function updateTask(taskId: string, formData: FormData) {
     before &&
     before.status !== "Completed" &&
     newStatus === "Completed" &&
-    (!str(formData.get("slack_link")) || !str(formData.get("sheet_link")))
+    !str(formData.get("slack_link")) &&
+    !str(formData.get("sheet_link"))
   ) {
-    return { error: "Add a Slack link and a Sheet link before marking a task Delivered." };
+    return { error: "Add a Slack link or a Sheet link (at least one) before marking a task Delivered." };
   }
 
   const { error } = await supabase
@@ -843,10 +843,10 @@ export async function changeStatus(taskId: string, newStatus: Status) {
     throw new Error("Set an ETA (a real date) before moving this task to Working.");
   }
 
-  // Delivering requires both links; the board routes this through deliverTask,
+  // Delivering requires at least one link; the board routes this through deliverTask,
   // but guard here too so it can't be completed link-less by any path.
-  if (newStatus === "Completed" && (!before.slack_link || !before.sheet_link)) {
-    throw new Error("Add a Slack link and a Sheet link before delivering.");
+  if (newStatus === "Completed" && !before.slack_link && !before.sheet_link) {
+    throw new Error("Add a Slack link or a Sheet link before delivering.");
   }
 
   const update: { status: Status; assignee_id?: string } = { status: newStatus };
@@ -889,15 +889,15 @@ export async function changeStatus(taskId: string, newStatus: Status) {
   revalidatePath("/people");
 }
 
-// Deliver a task (move to Completed) — requires a Slack link and a Sheet link,
-// collected by a popup on the board. Sets the links + status together.
+// Deliver a task (move to Completed) — requires at least one of a Slack link or
+// a Sheet link, collected by a popup on the board. Sets the links + status together.
 export async function deliverTask(taskId: string, slackLink: string, sheetLink: string) {
   const supabase = createClient();
   const me = await currentProfile();
 
   const slack = (slackLink ?? "").trim();
   const sheet = (sheetLink ?? "").trim();
-  if (!slack || !sheet) throw new Error("Both a Slack link and a Sheet link are required to deliver.");
+  if (!slack && !sheet) throw new Error("Add a Slack link or a Sheet link (at least one) to deliver.");
 
   const { data: before } = await supabase
     .from("tasks")
@@ -910,7 +910,7 @@ export async function deliverTask(taskId: string, slackLink: string, sheetLink: 
 
   const { error } = await supabase
     .from("tasks")
-    .update({ status: "Completed", slack_link: slack, sheet_link: sheet })
+    .update({ status: "Completed", slack_link: slack || null, sheet_link: sheet || null })
     .eq("id", taskId);
   if (error) throw new Error(error.message);
 
@@ -1349,6 +1349,50 @@ export async function setMembership(profileId: string, program: string, role: Me
 }
 
 // Remove a program membership. Admins can remove any; MOs only 'user' rows in their programs.
+// Grant access to several programs at once (same role for all). Mirrors
+// setMembership's permission rule per program: admins can set any role; MOs may
+// only add Users to programs they own.
+export async function setMemberships(
+  profileId: string,
+  programs: string[],
+  role: MembershipRole
+) {
+  const access = await getMyAccess();
+  const clean = Array.from(
+    new Set((programs ?? []).map((p) => (p ?? "").trim()).filter(Boolean))
+  );
+  if (clean.length === 0) return;
+
+  for (const program of clean) {
+    const canManage = access.isAdmin || (role === "user" && access.moPrograms.includes(program));
+    if (!canManage) throw new Error(`Not allowed to manage “${program}”.`);
+  }
+
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("program_memberships")
+    .upsert(
+      clean.map((program) => ({ profile_id: profileId, program, role })),
+      { onConflict: "profile_id,program" }
+    );
+  if (error) throw new Error(error.message);
+
+  const who = (await nameForProfile(profileId)) ?? "someone";
+  await logActivity({
+    action: "updated",
+    entityType: "membership",
+    entityId: profileId,
+    entityLabel: who,
+    summary: `Set ${who} as ${role.toUpperCase()} of ${clean.join(", ")}`,
+    program: clean[0] ?? null,
+  });
+
+  revalidatePath("/admin");
+  revalidatePath("/board");
+  revalidatePath("/tasks");
+  revalidatePath("/adhoc");
+}
+
 export async function removeMembership(profileId: string, program: string) {
   const access = await getMyAccess();
   const admin = createAdminClient();
