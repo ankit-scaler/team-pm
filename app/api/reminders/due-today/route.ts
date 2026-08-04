@@ -14,6 +14,8 @@ function fmtShort(iso: string | null): string {
   const [y, m, d] = iso.split("-").map(Number);
   return new Date(y, m - 1, d).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
+// "ETA Aug 5" when dated, plain "no ETA" otherwise.
+const etaLabel = (iso: string | null) => (iso ? `ETA ${fmtShort(iso)}` : "no ETA");
 
 // Priority → P-level buckets (highest first). Unknown priorities fall to "Other".
 const BUCKETS: { key: string; label: string }[] = [
@@ -48,14 +50,14 @@ function buildMessage(name: string, tasks: T[], today: string): string {
     msg +=
       `\n\n*${b.label} — ${items.length}*\n` +
       items
-        .map((t) => `•  ${t.title}  ·  ETA ${fmtShort(t.eta)}${t.effort ? `  ·  ${t.effort} effort` : ""}`)
+        .map((t) => `•  ${t.title}  ·  ${etaLabel(t.eta)}${t.effort ? `  ·  ${t.effort} effort` : ""}`)
         .join("\n");
   }
   const others = tasks.filter((t) => !seen.has(t.id));
   if (others.length) {
     msg +=
       `\n\n*Other — ${others.length}*\n` +
-      others.map((t) => `•  ${t.title}  ·  ETA ${fmtShort(t.eta)}`).join("\n");
+      others.map((t) => `•  ${t.title}  ·  ${etaLabel(t.eta)}`).join("\n");
   }
 
   msg += `\n\n_Please keep the board updated so this stays accurate 🙏_`;
@@ -72,6 +74,12 @@ export async function GET(request: Request) {
   }
 
   try {
+    // Test controls: ?only=<email> restricts to one recipient; ?dry=1 composes
+    // the messages and returns them WITHOUT sending anything.
+    const url = new URL(request.url);
+    const only = (url.searchParams.get("only") ?? "").trim().toLowerCase() || null;
+    const dry = ["1", "true", "yes"].includes((url.searchParams.get("dry") ?? "").toLowerCase());
+
     const admin = createAdminClient();
     // "Today" in the team's timezone (IST) as YYYY-MM-DD, matched against eta.
     const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
@@ -94,12 +102,25 @@ export async function GET(request: Request) {
     }
 
     let sent = 0;
+    const preview: { email: string; text: string }[] = [];
     for (const [email, g] of Array.from(byUser.entries())) {
+      if (only && email.toLowerCase() !== only) continue; // targeted test
+      const text = buildMessage(g.name, g.tasks, today);
+      if (dry) {
+        preview.push({ email, text }); // preview only — nothing sent
+        continue;
+      }
       // Everyone with at least one open task gets their prioritised snapshot.
-      if (await dmUserByEmail(email, buildMessage(g.name, g.tasks, today))) sent++;
+      if (await dmUserByEmail(email, text)) sent++;
     }
 
-    return NextResponse.json({ ok: true, date: today, users: byUser.size, sent });
+    return NextResponse.json({
+      ok: true,
+      date: today,
+      users: byUser.size,
+      sent,
+      ...(dry ? { dryRun: true, preview } : {}),
+    });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
