@@ -99,6 +99,8 @@ export function KanbanBoard({
   const [stakeholder, setStakeholder] = useState(""); // display name, matched against task stakeholders / adhoc stakeholder
   const [program, setProgram] = useState(""); // admin-only
   const [metric, setMetric] = useState("");
+  const [etaFrom, setEtaFrom] = useState(""); // YYYY-MM-DD, matched against ETA
+  const [etaTo, setEtaTo] = useState("");
 
   // Clear the per-card spinner once the move's server action settles.
   useEffect(() => {
@@ -132,10 +134,12 @@ export function KanbanBoard({
         return false;
       if (isAdmin && program && t.program !== program) return false;
       if (metric && !(t.metrics ?? []).includes(metric)) return false;
+      if (etaFrom && (!t.eta || t.eta < etaFrom)) return false;
+      if (etaTo && (!t.eta || t.eta > etaTo)) return false;
       if (q && !t.title.toLowerCase().includes(q.toLowerCase())) return false;
       return true;
     });
-  }, [tasks, assignee, tag, month, q, stakeholder, program, metric, isAdmin]);
+  }, [tasks, assignee, tag, month, q, stakeholder, program, metric, etaFrom, etaTo, isAdmin]);
 
   // Adhoc requests appear on the board too, in their status column. They have no
   // tags, so the tag filter hides them; the person filter matches their assignee.
@@ -148,6 +152,8 @@ export function KanbanBoard({
       if (stakeholder && a.stakeholder !== stakeholder) return false;
       if (isAdmin && program && a.program !== program) return false;
       if (metric && !(a.metrics ?? []).includes(metric)) return false;
+      if (etaFrom && (!a.eta || a.eta < etaFrom)) return false;
+      if (etaTo && (!a.eta || a.eta > etaTo)) return false;
       if (q) {
         const hay = [a.title, a.module, a.program, a.raised_by, a.assignee?.full_name, a.assignee?.email]
           .filter(Boolean)
@@ -157,9 +163,10 @@ export function KanbanBoard({
       }
       return true;
     });
-  }, [adhocRequests, assignee, tag, month, q, stakeholder, program, metric, isAdmin]);
+  }, [adhocRequests, assignee, tag, month, q, stakeholder, program, metric, etaFrom, etaTo, isAdmin]);
 
-  const anyFilter = assignee || tag || month || q || stakeholder || (isAdmin && program) || metric;
+  const anyFilter =
+    assignee || tag || month || q || stakeholder || (isAdmin && program) || metric || etaFrom || etaTo;
 
   // Distinct stakeholder names across tasks (Profile names) + adhoc (free text).
   const stakeholderOptions = useMemo(() => {
@@ -293,6 +300,26 @@ export function KanbanBoard({
             ))}
           </select>
         )}
+        <div className="flex items-center gap-1.5">
+          <span className="shrink-0 text-xs text-muted">ETA</span>
+          <input
+            type="date"
+            value={etaFrom}
+            onChange={(e) => setEtaFrom(e.target.value)}
+            onClick={(e) => (e.currentTarget as any).showPicker?.()}
+            title="ETA from"
+            className={`${selCls} w-[150px] cursor-pointer`}
+          />
+          <span className="shrink-0 text-xs text-muted">to</span>
+          <input
+            type="date"
+            value={etaTo}
+            onChange={(e) => setEtaTo(e.target.value)}
+            onClick={(e) => (e.currentTarget as any).showPicker?.()}
+            title="ETA to"
+            className={`${selCls} w-[150px] cursor-pointer`}
+          />
+        </div>
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
@@ -310,6 +337,8 @@ export function KanbanBoard({
               setStakeholder("");
               setProgram("");
               setMetric("");
+              setEtaFrom("");
+              setEtaTo("");
             }}
             className="text-xs text-accent hover:underline"
           >
