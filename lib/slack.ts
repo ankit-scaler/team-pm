@@ -74,6 +74,19 @@ export async function getMessagePermalink(channel: string, messageTs: string): P
   }
 }
 
+// Open a Slack modal (popup) via views.open. Used by the "create task from a
+// message" shortcut so the link appears instantly, centered — no scrolling.
+// trigger_id is only valid for ~3s. Best-effort (never throws).
+export async function openModal(triggerId: string, view: Record<string, unknown>): Promise<boolean> {
+  if (!botToken() || !triggerId) return false;
+  try {
+    const res = await slackApi("views.open", { trigger_id: triggerId, view });
+    return Boolean(res?.ok);
+  } catch {
+    return false;
+  }
+}
+
 // Send a direct message to a user identified by email. Resolves the Slack user
 // via users.lookupByEmail, then posts to them. Best-effort (never throws).
 // Requires the bot to have the users:read.email + chat:write scopes.
