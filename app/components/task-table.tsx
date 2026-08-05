@@ -41,6 +41,7 @@ export function TaskTable({
   efforts = [],
   allowedPrograms = [],
   canCreateMetrics = false,
+  teams = [],
 }: {
   tasks: Task[];
   people: Profile[];
@@ -52,6 +53,7 @@ export function TaskTable({
   efforts?: string[];
   allowedPrograms?: string[];
   canCreateMetrics?: boolean;
+  teams?: { id: string; name: string; memberIds: string[] }[];
 }) {
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("");
@@ -60,10 +62,16 @@ export function TaskTable({
   const [tag, setTag] = useState("");
   const [metric, setMetric] = useState("");
   const [program, setProgram] = useState("");
+  const [team, setTeam] = useState(""); // admin-only, team id
   const [track, setTrack] = useState("");
   const [month, setMonth] = useState(""); // YYYY-MM, matched against ETA
   const [etaFrom, setEtaFrom] = useState("");
   const [etaTo, setEtaTo] = useState("");
+
+  const teamMemberSet = useMemo(() => {
+    const t = teams.find((x) => x.id === team);
+    return t ? new Set(t.memberIds) : null;
+  }, [teams, team]);
 
   const filtered = useMemo(() => {
     return tasks.filter((t) => {
@@ -74,6 +82,7 @@ export function TaskTable({
       if (tag && !t.tags.includes(tag)) return false;
       if (metric && !t.metrics.includes(metric)) return false;
       if (program && t.program !== program) return false;
+      if (teamMemberSet && !(t.assignee_id && teamMemberSet.has(t.assignee_id))) return false;
       if (track && t.track !== track) return false;
       if (month && (!t.eta || !t.eta.startsWith(month))) return false;
       if (etaFrom && (!t.eta || t.eta < etaFrom)) return false;
@@ -81,9 +90,9 @@ export function TaskTable({
       if (q && !t.title.toLowerCase().includes(q.toLowerCase())) return false;
       return true;
     });
-  }, [tasks, q, status, assignee, priority, tag, metric, program, track, month, etaFrom, etaTo]);
+  }, [tasks, q, status, assignee, priority, tag, metric, program, teamMemberSet, track, month, etaFrom, etaTo]);
 
-  const anyFilter = q || status || assignee || priority || tag || metric || program || track || month || etaFrom || etaTo;
+  const anyFilter = q || status || assignee || priority || tag || metric || program || team || track || month || etaFrom || etaTo;
 
   // Distinct ETA months present, newest first — powers the Month dropdown.
   const monthOptions = useMemo(() => {
@@ -142,6 +151,14 @@ export function TaskTable({
             <option key={p} value={p}>{p}</option>
           ))}
         </select>
+        {teams.length > 0 && (
+          <select value={team} onChange={(e) => setTeam(e.target.value)} title="Filter by team" className={selCls}>
+            <option value="">All teams</option>
+            {teams.map((t) => (
+              <option key={t.id} value={t.id}>{t.name}</option>
+            ))}
+          </select>
+        )}
         <select value={track} onChange={(e) => setTrack(e.target.value)} className={selCls}>
           <option value="">All tracks</option>
           {tracks.map((t) => (
@@ -166,7 +183,7 @@ export function TaskTable({
           <button
             type="button"
             onClick={() => {
-              setQ(""); setStatus(""); setAssignee(""); setPriority(""); setTag(""); setMetric(""); setProgram(""); setTrack(""); setMonth(""); setEtaFrom(""); setEtaTo("");
+              setQ(""); setStatus(""); setAssignee(""); setPriority(""); setTag(""); setMetric(""); setProgram(""); setTeam(""); setTrack(""); setMonth(""); setEtaFrom(""); setEtaTo("");
             }}
             className="text-xs text-accent hover:underline"
           >
@@ -260,17 +277,30 @@ export function TaskTable({
                   )}
                 </td>
                 <td className="px-4 py-3 text-right">
-                  <TaskForm
-                    people={people}
-                    task={t}
-                    allTags={allTags}
-                    allMetrics={allMetrics}
-                    allowedPrograms={allowedPrograms}
-                    tracks={tracks}
-                    efforts={efforts}
-                    priorities={priorities}
-                    canCreateMetrics={canCreateMetrics}
-                  />
+                  <div className="inline-flex items-center gap-0.5">
+                    <TaskForm
+                      people={people}
+                      duplicateFrom={t}
+                      allTags={allTags}
+                      allMetrics={allMetrics}
+                      allowedPrograms={allowedPrograms}
+                      tracks={tracks}
+                      efforts={efforts}
+                      priorities={priorities}
+                      canCreateMetrics={canCreateMetrics}
+                    />
+                    <TaskForm
+                      people={people}
+                      task={t}
+                      allTags={allTags}
+                      allMetrics={allMetrics}
+                      allowedPrograms={allowedPrograms}
+                      tracks={tracks}
+                      efforts={efforts}
+                      priorities={priorities}
+                      canCreateMetrics={canCreateMetrics}
+                    />
+                  </div>
                 </td>
               </tr>
             ))}

@@ -59,6 +59,32 @@ export type AiImpactSummary = {
   programs: AiProgramSummary[];
 };
 
+// Teams — admin-created groups with a leader; a person can be in many teams.
+export type TeamMemberStatus = "pending" | "accepted";
+export type Team = {
+  id: string;
+  name: string;
+  leader_id: string | null;
+  created_at: string;
+};
+// Shape used by the join screen: team + leader name + accepted count + my status.
+export type JoinTeam = {
+  id: string;
+  name: string;
+  leaderName: string | null;
+  memberCount: number;
+  myStatus: TeamMemberStatus | null;
+};
+// Shape used by the admin/leader management view.
+export type ManageTeamMember = { profileId: string; name: string; email: string; status: TeamMemberStatus };
+export type ManageTeam = {
+  id: string;
+  name: string;
+  leaderId: string | null;
+  leaderName: string | null;
+  members: ManageTeamMember[]; // accepted + pending
+};
+
 export const PROGRAMS = ["Academy", "DevOps", "AIML", "DSML"] as const;
 export type Program = (typeof PROGRAMS)[number];
 

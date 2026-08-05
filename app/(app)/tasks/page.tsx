@@ -8,6 +8,7 @@ import {
   getTags,
   getEfforts,
   getPriorities,
+  getTeamsWithMembers,
 } from "@/lib/queries";
 import { getMyAccess } from "@/lib/access";
 import { TaskTable } from "../../components/task-table";
@@ -17,7 +18,7 @@ import { AdhocForm } from "../../components/adhoc-form";
 export const dynamic = "force-dynamic";
 
 export default async function TasksPage() {
-  const [tasks, people, access, allMetrics, allPrograms, tracks, tagList, efforts, priorities] =
+  const [tasks, people, access, allMetrics, allPrograms, tracks, tagList, efforts, priorities, teams] =
     await Promise.all([
       getTasks(),
       getPeople(),
@@ -28,6 +29,7 @@ export default async function TasksPage() {
       getTags(),
       getEfforts(),
       getPriorities(),
+      getTeamsWithMembers(),
     ]);
   const allTags = Array.from(new Set([...tagList, ...distinctTags(tasks)]));
   const allowedPrograms = access.isAdmin ? allPrograms : access.visiblePrograms;
@@ -44,7 +46,7 @@ export default async function TasksPage() {
           <TaskForm people={people} allTags={allTags} allMetrics={allMetrics} allowedPrograms={allowedPrograms} tracks={tracks} efforts={efforts} priorities={priorities} canCreateMetrics={access.isAdmin} />
         </div>
       </div>
-      <TaskTable tasks={tasks} people={people} allTags={allTags} allMetrics={allMetrics} programs={allPrograms} tracks={tracks} priorities={priorities} efforts={efforts} allowedPrograms={allowedPrograms} canCreateMetrics={access.isAdmin} />
+      <TaskTable tasks={tasks} people={people} allTags={allTags} allMetrics={allMetrics} programs={allPrograms} tracks={tracks} priorities={priorities} efforts={efforts} allowedPrograms={allowedPrograms} canCreateMetrics={access.isAdmin} teams={access.isAdmin ? teams : []} />
     </div>
   );
 }

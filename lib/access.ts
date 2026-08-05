@@ -18,6 +18,7 @@ import { createClient } from "@/lib/supabase/server";
 
 export type MembershipRole = "mo" | "user";
 export type Membership = { program: string; role: MembershipRole };
+export type TeamStatus = { teamId: string; status: "pending" | "accepted" };
 
 export type Access = {
   userId: string | null;
@@ -29,6 +30,14 @@ export type Access = {
   moPrograms: string[];
   /** Signed in, not admin, and assigned to no program yet. */
   isPending: boolean;
+  /** Team ids where the user is the leader. */
+  ledTeamIds: string[];
+  /** The user's team memberships (pending or accepted). */
+  teamStatuses: TeamStatus[];
+  /** Has requested/joined at least one team (leader counts). */
+  hasAnyTeam: boolean;
+  /** Accepted into at least one team (leader counts). Gates app access. */
+  hasAcceptedTeam: boolean;
 };
 
 // Wrapped in React cache so repeated calls within one render (layout + pages +
@@ -47,6 +56,10 @@ export const getMyAccess = cache(async function getMyAccess(): Promise<Access> {
       visiblePrograms: [],
       moPrograms: [],
       isPending: false,
+      ledTeamIds: [],
+      teamStatuses: [],
+      hasAnyTeam: false,
+      hasAcceptedTeam: false,
     };
   }
 
@@ -66,6 +79,18 @@ export const getMyAccess = cache(async function getMyAccess(): Promise<Access> {
   const visiblePrograms = memberships.map((m) => m.program);
   const moPrograms = memberships.filter((m) => m.role === "mo").map((m) => m.program);
 
+  // Teams the user leads, and the user's own memberships. Tables may not exist
+  // pre-migration — fall back to empty so the app still loads.
+  const [{ data: led }, { data: tm }] = await Promise.all([
+    supabase.from("teams").select("id").eq("leader_id", user.id),
+    supabase.from("team_members").select("team_id, status").eq("profile_id", user.id),
+  ]);
+  const ledTeamIds = (led ?? []).map((r: any) => r.id as string);
+  const teamStatuses = (tm ?? []).map((r: any) => ({
+    teamId: r.team_id as string,
+    status: r.status as "pending" | "accepted",
+  }));
+
   return {
     userId: user.id,
     isAdmin,
@@ -73,6 +98,10 @@ export const getMyAccess = cache(async function getMyAccess(): Promise<Access> {
     visiblePrograms,
     moPrograms,
     isPending: !isAdmin && memberships.length === 0,
+    ledTeamIds,
+    teamStatuses,
+    hasAnyTeam: teamStatuses.length > 0 || ledTeamIds.length > 0,
+    hasAcceptedTeam: teamStatuses.some((s) => s.status === "accepted") || ledTeamIds.length > 0,
   };
 });
 

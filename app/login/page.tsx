@@ -25,9 +25,10 @@ function LoginInner() {
     <main className="grid min-h-screen place-items-center px-6">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-xl bg-accent text-lg font-bold text-white shadow-sm">
-            Scaler
-          </div>
+          <span className="mb-4 inline-flex items-center justify-center rounded-xl bg-accent px-4 py-2.5 shadow-sm">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/scaler-white.svg" alt="Scaler" className="h-6 w-auto" />
+          </span>
           <h1 className="text-xl font-semibold tracking-tight">Instructor team Task Manager</h1>
           <p className="mt-1 text-sm text-muted">Sign in to manage the team's work</p>
         </div>

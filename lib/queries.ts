@@ -1,6 +1,6 @@
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { getMyAccess } from "@/lib/access";
-import { DEFAULT_METRICS, PROGRAMS, TRACKS, EFFORTS, PRIORITIES, IMPACT_STATUS_DEFAULTS, type AdhocRequest, type ImpactRow, type Profile, type Task } from "@/lib/types";
+import { DEFAULT_METRICS, PROGRAMS, TRACKS, EFFORTS, PRIORITIES, IMPACT_STATUS_DEFAULTS, type AdhocRequest, type ImpactRow, type Profile, type Task, type JoinTeam, type ManageTeam, type ManageTeamMember, type TeamMemberStatus } from "@/lib/types";
 import { DEFAULT_KRS, type KR } from "@/lib/kr-defaults";
 
 export type MembershipRow = { profile_id: string; program: string; role: "mo" | "user" };
@@ -283,4 +283,95 @@ export async function getMetricNames(): Promise<string[]> {
   const { data, error } = await supabase.from("metrics").select("name").order("name");
   if (error || !data) return [...DEFAULT_METRICS];
   return data.map((r: any) => r.name as string);
+}
+
+// -------------------------------- Teams --------------------------------
+
+// All teams for the join screen: leader name, accepted-member count, and the
+// current user's status in each (null / pending / accepted).
+export async function getTeamsForJoin(): Promise<JoinTeam[]> {
+  const supabase = createClient();
+  const access = await getMyAccess();
+  const [{ data: teams }, { data: members }] = await Promise.all([
+    supabase
+      .from("teams")
+      .select(`id, name, leader:profiles!teams_leader_id_fkey ( full_name, email )`)
+      .order("name", { ascending: true }),
+    supabase.from("team_members").select("team_id, profile_id, status"),
+  ]);
+
+  const acceptedCount = new Map<string, number>();
+  const mine = new Map<string, TeamMemberStatus>();
+  for (const m of (members ?? []) as any[]) {
+    if (m.status === "accepted") acceptedCount.set(m.team_id, (acceptedCount.get(m.team_id) ?? 0) + 1);
+    if (m.profile_id === access.userId) mine.set(m.team_id, m.status as TeamMemberStatus);
+  }
+
+  return (teams ?? []).map((t: any) => ({
+    id: t.id,
+    name: t.name,
+    leaderName: t.leader?.full_name ?? t.leader?.email ?? null,
+    memberCount: acceptedCount.get(t.id) ?? 0,
+    myStatus: mine.get(t.id) ?? null,
+  }));
+}
+
+// Teams with their members (accepted + pending) for the management page.
+// Admins get every team; leaders get only the teams they lead.
+export async function getTeamsManage(): Promise<ManageTeam[]> {
+  const supabase = createClient();
+  const access = await getMyAccess();
+  const [{ data: teams }, { data: members }] = await Promise.all([
+    supabase
+      .from("teams")
+      .select(`id, name, leader_id, leader:profiles!teams_leader_id_fkey ( full_name, email )`)
+      .order("name", { ascending: true }),
+    supabase
+      .from("team_members")
+      .select(`team_id, status, profile:profiles!team_members_profile_id_fkey ( id, full_name, email )`),
+  ]);
+
+  const byTeam = new Map<string, ManageTeamMember[]>();
+  for (const m of (members ?? []) as any[]) {
+    if (!m.profile) continue;
+    const list = byTeam.get(m.team_id) ?? [];
+    list.push({
+      profileId: m.profile.id,
+      name: m.profile.full_name ?? m.profile.email,
+      email: m.profile.email,
+      status: m.status as TeamMemberStatus,
+    });
+    byTeam.set(m.team_id, list);
+  }
+
+  let list = (teams ?? []).map((t: any) => ({
+    id: t.id,
+    name: t.name,
+    leaderId: t.leader_id ?? null,
+    leaderName: t.leader?.full_name ?? t.leader?.email ?? null,
+    members: (byTeam.get(t.id) ?? []).sort((a, b) => {
+      // Pending first (need action), then alphabetical.
+      if (a.status !== b.status) return a.status === "pending" ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    }),
+  }));
+
+  if (!access.isAdmin) list = list.filter((t) => access.ledTeamIds.includes(t.id));
+  return list;
+}
+
+// team id → accepted member profile ids, for the board/tasks team filter.
+export async function getTeamsWithMembers(): Promise<{ id: string; name: string; memberIds: string[] }[]> {
+  const supabase = createClient();
+  const [{ data: teams }, { data: members }] = await Promise.all([
+    supabase.from("teams").select("id, name").order("name", { ascending: true }),
+    supabase.from("team_members").select("team_id, profile_id").eq("status", "accepted"),
+  ]);
+  const byTeam = new Map<string, string[]>();
+  for (const m of (members ?? []) as any[]) {
+    const list = byTeam.get(m.team_id) ?? [];
+    list.push(m.profile_id);
+    byTeam.set(m.team_id, list);
+  }
+  return (teams ?? []).map((t: any) => ({ id: t.id, name: t.name, memberIds: byTeam.get(t.id) ?? [] }));
 }
