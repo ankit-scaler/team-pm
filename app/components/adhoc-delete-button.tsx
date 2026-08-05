@@ -1,7 +1,7 @@
 "use client";
 
 import { useTransition } from "react";
-import { Trash2 } from "lucide-react";
+import { Trash2, Loader2 } from "lucide-react";
 import { deleteAdhocRequest } from "../(app)/actions";
 
 // Delete control for an adhoc request. Used on the Adhoc list and the Board card.
@@ -30,7 +30,7 @@ export function AdhocDeleteButton({ id, className }: { id: string; className?: s
         "grid h-8 w-8 place-items-center rounded-md text-muted transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50 dark:hover:bg-red-950/40 dark:hover:text-red-400"
       }
     >
-      <Trash2 size={15} />
+      {pending ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
     </button>
   );
 }

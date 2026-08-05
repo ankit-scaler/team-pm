@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { Trash2, X } from "lucide-react";
+import { Trash2, X, Loader2 } from "lucide-react";
 import {
   deleteUser,
   setUserRole,
@@ -51,6 +51,11 @@ export function AdminUsers({
   return (
     <div className="space-y-3">
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+      {pending && (
+        <p className="flex items-center gap-1.5 text-xs text-muted">
+          <Loader2 size={13} className="animate-spin" /> Saving…
+        </p>
+      )}
       <div className="overflow-x-auto rounded-xl border border-border bg-surface">
         <table className="w-full text-left text-sm">
           <thead className="border-b border-border text-xs uppercase tracking-wide text-muted">
