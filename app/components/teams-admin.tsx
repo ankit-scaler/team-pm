@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { Check, X, Trash2, Plus, Crown, Clock, Pencil } from "lucide-react";
+import { useEffect, useState, useTransition } from "react";
+import { Check, X, Trash2, Plus, Crown, Clock, Pencil, Loader2 } from "lucide-react";
 import {
   createTeam,
   renameTeam,
@@ -22,10 +22,16 @@ export function TeamsAdmin({
   isAdmin: boolean;
 }) {
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null); // which action is running
   const [pending, startTransition] = useTransition();
+  useEffect(() => {
+    if (!pending) setBusy(null);
+  }, [pending]);
 
-  function run(fn: () => Promise<void>) {
+  // `key` identifies the specific button so only it shows a spinner.
+  function run(key: string, fn: () => Promise<void>) {
     setError(null);
+    setBusy(key);
     startTransition(async () => {
       try {
         await fn();
@@ -39,7 +45,7 @@ export function TeamsAdmin({
     <div className="space-y-4">
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
-      {isAdmin && <CreateTeam people={people} disabled={pending} run={run} />}
+      {isAdmin && <CreateTeam people={people} disabled={pending} busy={busy} run={run} />}
 
       {teams.length === 0 && (
         <p className="rounded-xl border border-border bg-surface p-6 text-center text-sm text-muted">
@@ -49,21 +55,25 @@ export function TeamsAdmin({
 
       <div className="space-y-3">
         {teams.map((t) => (
-          <TeamCard key={t.id} team={t} people={people} isAdmin={isAdmin} disabled={pending} run={run} />
+          <TeamCard key={t.id} team={t} people={people} isAdmin={isAdmin} disabled={pending} busy={busy} run={run} />
         ))}
       </div>
     </div>
   );
 }
 
+type RunFn = (key: string, fn: () => Promise<void>) => void;
+
 function CreateTeam({
   people,
   disabled,
+  busy,
   run,
 }: {
   people: Profile[];
   disabled: boolean;
-  run: (fn: () => Promise<void>) => void;
+  busy: string | null;
+  run: RunFn;
 }) {
   const [name, setName] = useState("");
   const [leader, setLeader] = useState("");
@@ -88,7 +98,7 @@ function CreateTeam({
         type="button"
         disabled={!name.trim() || !leader || disabled}
         onClick={() =>
-          run(async () => {
+          run("create", async () => {
             await createTeam(name.trim(), leader);
             setName("");
             setLeader("");
@@ -96,7 +106,7 @@ function CreateTeam({
         }
         className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3.5 py-2 text-sm font-semibold text-white disabled:opacity-40"
       >
-        <Plus size={16} /> Create team
+        {busy === "create" ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />} Create team
       </button>
     </div>
   );
@@ -107,13 +117,15 @@ function TeamCard({
   people,
   isAdmin,
   disabled,
+  busy,
   run,
 }: {
   team: ManageTeam;
   people: Profile[];
   isAdmin: boolean;
   disabled: boolean;
-  run: (fn: () => Promise<void>) => void;
+  busy: string | null;
+  run: RunFn;
 }) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(team.name);
@@ -137,10 +149,10 @@ function TeamCard({
               <button
                 type="button"
                 disabled={disabled || !name.trim()}
-                onClick={() => run(async () => { await renameTeam(team.id, name.trim()); setEditing(false); })}
-                className="rounded-md bg-accent px-2 py-1 text-xs font-semibold text-white disabled:opacity-40"
+                onClick={() => run("rename", async () => { await renameTeam(team.id, name.trim()); setEditing(false); })}
+                className="inline-flex items-center gap-1 rounded-md bg-accent px-2 py-1 text-xs font-semibold text-white disabled:opacity-40"
               >
-                Save
+                {busy === "rename" && <Loader2 size={12} className="animate-spin" />} Save
               </button>
               <button type="button" onClick={() => { setName(team.name); setEditing(false); }} className="text-xs text-muted hover:text-fg">
                 Cancel
@@ -162,7 +174,7 @@ function TeamCard({
             {isAdmin ? (
               <select
                 value={team.leaderId ?? ""}
-                onChange={(e) => run(() => setTeamLeader(team.id, e.target.value))}
+                onChange={(e) => run("leader", () => setTeamLeader(team.id, e.target.value))}
                 disabled={disabled}
                 className="rounded-md border border-border bg-surface px-1.5 py-0.5 text-xs outline-none"
               >
@@ -183,11 +195,11 @@ function TeamCard({
             disabled={disabled}
             onClick={() => {
               if (confirm(`Delete team "${team.name}"? Members will be unassigned from it.`))
-                run(() => deleteTeam(team.id));
+                run("delete", () => deleteTeam(team.id));
             }}
             className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-red-600 hover:bg-red-50 disabled:opacity-40 dark:text-red-400 dark:hover:bg-red-950/40"
           >
-            <Trash2 size={13} />
+            {busy === "delete" ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
           </button>
         )}
       </div>
@@ -206,18 +218,18 @@ function TeamCard({
                   <button
                     type="button"
                     disabled={disabled}
-                    onClick={() => run(() => acceptMember(team.id, m.profileId))}
+                    onClick={() => run(`accept:${m.profileId}`, () => acceptMember(team.id, m.profileId))}
                     className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2 py-1 text-[11px] font-semibold text-white disabled:opacity-40"
                   >
-                    <Check size={12} /> Accept
+                    {busy === `accept:${m.profileId}` ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />} Accept
                   </button>
                   <button
                     type="button"
                     disabled={disabled}
-                    onClick={() => run(() => removeMember(team.id, m.profileId))}
+                    onClick={() => run(`reject:${m.profileId}`, () => removeMember(team.id, m.profileId))}
                     className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] font-medium text-muted hover:text-fg disabled:opacity-40"
                   >
-                    <X size={12} /> Reject
+                    {busy === `reject:${m.profileId}` ? <Loader2 size={12} className="animate-spin" /> : <X size={12} />} Reject
                   </button>
                 </div>
               </div>
@@ -246,11 +258,11 @@ function TeamCard({
                     <button
                       type="button"
                       disabled={disabled}
-                      onClick={() => run(() => removeMember(team.id, m.profileId))}
+                      onClick={() => run(`remove:${m.profileId}`, () => removeMember(team.id, m.profileId))}
                       className="text-muted hover:text-red-600 disabled:opacity-40"
                       aria-label={`Remove ${m.name}`}
                     >
-                      <X size={11} />
+                      {busy === `remove:${m.profileId}` ? <Loader2 size={11} className="animate-spin" /> : <X size={11} />}
                     </button>
                   )}
                 </span>

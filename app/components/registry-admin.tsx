@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus } from "lucide-react";
+import { Plus, Loader2 } from "lucide-react";
 import {
   createProgram,
   createTrack,
@@ -111,7 +111,7 @@ function Section({
           onClick={add}
           className="inline-flex items-center gap-1 rounded-lg bg-accent px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
         >
-          <Plus size={15} /> Add
+          {pending ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />} Add
         </button>
       </div>
       {error && <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">{error}</p>}
