@@ -79,6 +79,14 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const only = (url.searchParams.get("only") ?? "").trim().toLowerCase() || null;
     const dry = ["1", "true", "yes"].includes((url.searchParams.get("dry") ?? "").toLowerCase());
+    const force = ["1", "true", "yes"].includes((url.searchParams.get("force") ?? "").toLowerCase());
+
+    // Anti-spam guard: only ACTUALLY send when this is the real Vercel Cron
+    // (its requests carry a "vercel-cron" user-agent) or when ?force=1 is set.
+    // A casual manual hit just returns a preview — so testing can never DM the
+    // team by accident.
+    const isCron = (request.headers.get("user-agent") ?? "").toLowerCase().includes("vercel-cron");
+    const willSend = !dry && (isCron || force);
 
     const admin = createAdminClient();
     // "Today" in the team's timezone (IST) as YYYY-MM-DD, matched against eta.
@@ -106,8 +114,8 @@ export async function GET(request: Request) {
     for (const [email, g] of Array.from(byUser.entries())) {
       if (only && email.toLowerCase() !== only) continue; // targeted test
       const text = buildMessage(g.name, g.tasks, today);
-      if (dry) {
-        preview.push({ email, text }); // preview only — nothing sent
+      if (!willSend) {
+        preview.push({ email, text }); // nothing sent (dry, or not the real cron)
         continue;
       }
       // Everyone with at least one open task gets their prioritised snapshot.
@@ -119,7 +127,7 @@ export async function GET(request: Request) {
       date: today,
       users: byUser.size,
       sent,
-      ...(dry ? { dryRun: true, preview } : {}),
+      ...(willSend ? {} : { sentNothing: true, reason: dry ? "dry" : "not the scheduled cron — pass ?force=1 to send", preview }),
     });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
