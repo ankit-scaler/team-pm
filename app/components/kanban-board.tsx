@@ -56,6 +56,7 @@ export function KanbanBoard({
   userId = null,
   isAdmin = false,
   moPrograms = [],
+  teams = [],
 }: {
   tasks: Task[];
   people: Profile[];
@@ -70,6 +71,7 @@ export function KanbanBoard({
   userId?: string | null;
   isAdmin?: boolean;
   moPrograms?: string[];
+  teams?: { id: string; name: string; memberIds: string[] }[];
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -98,6 +100,7 @@ export function KanbanBoard({
   const [q, setQ] = useState("");
   const [stakeholder, setStakeholder] = useState(""); // display name, matched against task stakeholders / adhoc stakeholder
   const [program, setProgram] = useState(""); // admin-only
+  const [team, setTeam] = useState(""); // admin-only, team id
   const [metric, setMetric] = useState("");
   const [etaFrom, setEtaFrom] = useState(""); // YYYY-MM-DD, matched against ETA
   const [etaTo, setEtaTo] = useState("");
@@ -121,6 +124,12 @@ export function KanbanBoard({
     };
   }, [router]);
 
+  // Selected team's accepted-member ids (admin filter). null = no team filter.
+  const teamMemberSet = useMemo(() => {
+    const t = teams.find((x) => x.id === team);
+    return t ? new Set(t.memberIds) : null;
+  }, [teams, team]);
+
   const visible = useMemo(() => {
     return tasks.filter((t) => {
       if (assignee === "unassigned" ? t.assignee_id : assignee && t.assignee_id !== assignee)
@@ -133,13 +142,14 @@ export function KanbanBoard({
       )
         return false;
       if (isAdmin && program && t.program !== program) return false;
+      if (isAdmin && teamMemberSet && !(t.assignee_id && teamMemberSet.has(t.assignee_id))) return false;
       if (metric && !(t.metrics ?? []).includes(metric)) return false;
       if (etaFrom && (!t.eta || t.eta < etaFrom)) return false;
       if (etaTo && (!t.eta || t.eta > etaTo)) return false;
       if (q && !t.title.toLowerCase().includes(q.toLowerCase())) return false;
       return true;
     });
-  }, [tasks, assignee, tag, month, q, stakeholder, program, metric, etaFrom, etaTo, isAdmin]);
+  }, [tasks, assignee, tag, month, q, stakeholder, program, teamMemberSet, metric, etaFrom, etaTo, isAdmin]);
 
   // Adhoc requests appear on the board too, in their status column. They have no
   // tags, so the tag filter hides them; the person filter matches their assignee.
@@ -151,6 +161,7 @@ export function KanbanBoard({
       if (month && (!a.eta || !a.eta.startsWith(month))) return false;
       if (stakeholder && a.stakeholder !== stakeholder) return false;
       if (isAdmin && program && a.program !== program) return false;
+      if (isAdmin && teamMemberSet && !(a.assignee_id && teamMemberSet.has(a.assignee_id))) return false;
       if (metric && !(a.metrics ?? []).includes(metric)) return false;
       if (etaFrom && (!a.eta || a.eta < etaFrom)) return false;
       if (etaTo && (!a.eta || a.eta > etaTo)) return false;
@@ -163,10 +174,10 @@ export function KanbanBoard({
       }
       return true;
     });
-  }, [adhocRequests, assignee, tag, month, q, stakeholder, program, metric, etaFrom, etaTo, isAdmin]);
+  }, [adhocRequests, assignee, tag, month, q, stakeholder, program, teamMemberSet, metric, etaFrom, etaTo, isAdmin]);
 
   const anyFilter =
-    assignee || tag || month || q || stakeholder || (isAdmin && program) || metric || etaFrom || etaTo;
+    assignee || tag || month || q || stakeholder || (isAdmin && (program || team)) || metric || etaFrom || etaTo;
 
   // Distinct stakeholder names across tasks (Profile names) + adhoc (free text).
   const stakeholderOptions = useMemo(() => {
@@ -287,6 +298,19 @@ export function KanbanBoard({
             ))}
           </select>
         )}
+        {isAdmin && teams.length > 0 && (
+          <select
+            value={team}
+            onChange={(e) => setTeam(e.target.value)}
+            title="Filter by team"
+            className={selCls}
+          >
+            <option value="">All teams</option>
+            {teams.map((t) => (
+              <option key={t.id} value={t.id}>{t.name}</option>
+            ))}
+          </select>
+        )}
         {metricOptions.length > 0 && (
           <select
             value={metric}
@@ -336,6 +360,7 @@ export function KanbanBoard({
               setQ("");
               setStakeholder("");
               setProgram("");
+              setTeam("");
               setMetric("");
               setEtaFrom("");
               setEtaTo("");

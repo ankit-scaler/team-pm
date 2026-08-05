@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, Plus, Trash2, X } from "lucide-react";
+import { Pencil, Plus, Trash2, X, Copy } from "lucide-react";
 import { createTask, updateTask, deleteTask, deleteMetric } from "../(app)/actions";
 import { StakeholderSelect } from "./stakeholder-select";
 import { TagSelect } from "./tag-select";
@@ -17,6 +17,7 @@ const Req = () => <span className="text-red-500"> *</span>;
 export function TaskForm({
   people,
   task,
+  duplicateFrom,
   allTags = [],
   allMetrics = [],
   allowedPrograms = [],
@@ -27,6 +28,9 @@ export function TaskForm({
 }: {
   people: Profile[];
   task?: Task;
+  /** When set (and `task` isn't), opens the CREATE form pre-filled from this
+   *  task — a "Duplicate" — but with ETA / links / status left blank. */
+  duplicateFrom?: Task;
   allTags?: string[];
   allMetrics?: string[];
   allowedPrograms?: string[];
@@ -43,6 +47,10 @@ export function TaskForm({
   const needsLinks = status === "Completed";
   const router = useRouter();
   const isEdit = Boolean(task);
+  // Source for the COPYABLE fields (title, description, assignee, priority, effort,
+  // program, track, tags, metrics, stakeholders). ETA / links / status are NOT
+  // seeded from here, so a duplicate starts fresh on those.
+  const seed = task ?? duplicateFrom;
   const [prefill, setPrefill] = useState<{ title?: string; description?: string; slackLink?: string }>({});
 
   // Prefill + auto-open the New-task form from URL params — e.g. a link shared
@@ -140,6 +148,16 @@ export function TaskForm({
         >
           <Pencil size={15} />
         </button>
+      ) : duplicateFrom ? (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="grid h-8 w-8 place-items-center rounded-md text-muted transition-colors hover:bg-bg hover:text-fg"
+          aria-label="Duplicate task"
+          title="Duplicate task"
+        >
+          <Copy size={15} />
+        </button>
       ) : (
         <button
           type="button"
@@ -152,7 +170,7 @@ export function TaskForm({
 
       {open && (
         <div
-          className="fixed inset-0 z-40 grid place-items-start overflow-y-auto bg-black/40 p-4 backdrop-blur-sm sm:place-items-center"
+          className="fixed inset-0 z-40 grid place-items-start overflow-y-auto bg-black/40 p-4 text-left backdrop-blur-sm sm:place-items-center"
           onClick={(e) => {
             if (e.target === e.currentTarget) setOpen(false);
           }}
@@ -164,7 +182,7 @@ export function TaskForm({
               </div>
             )}
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-base font-semibold">{isEdit ? "Edit task" : "New task"}</h2>
+              <h2 className="text-base font-semibold">{isEdit ? "Edit task" : duplicateFrom ? "Duplicate task" : "New task"}</h2>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
@@ -181,7 +199,7 @@ export function TaskForm({
                 <input
                   name="title"
                   required
-                  defaultValue={task?.title ?? prefill.title ?? ""}
+                  defaultValue={seed?.title ?? prefill.title ?? ""}
                   placeholder="What needs doing?"
                   className={fieldCls}
                 />
@@ -192,7 +210,7 @@ export function TaskForm({
                 <textarea
                   name="description"
                   rows={3}
-                  defaultValue={task?.description ?? prefill.description ?? ""}
+                  defaultValue={seed?.description ?? prefill.description ?? ""}
                   placeholder="Context, links, acceptance criteria…"
                   className={fieldCls}
                 />
@@ -201,7 +219,7 @@ export function TaskForm({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className={labelCls}>Assignee (picked by)<Req /></label>
-                  <select name="assignee_id" required defaultValue={task?.assignee_id ?? ""} className={fieldCls}>
+                  <select name="assignee_id" required defaultValue={seed?.assignee_id ?? ""} className={fieldCls}>
                     <option value="">Unassigned</option>
                     {people.map((p) => (
                       <option key={p.id} value={p.id}>
@@ -230,7 +248,7 @@ export function TaskForm({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className={labelCls}>Priority<Req /></label>
-                  <select name="priority" defaultValue={task?.priority ?? "Medium"} className={fieldCls}>
+                  <select name="priority" defaultValue={seed?.priority ?? "Medium"} className={fieldCls}>
                     {priorities.map((p) => (
                       <option key={p} value={p}>
                         {p}
@@ -240,7 +258,7 @@ export function TaskForm({
                 </div>
                 <div>
                   <label className={labelCls}>Effort</label>
-                  <select name="effort" defaultValue={task?.effort ?? ""} className={fieldCls}>
+                  <select name="effort" defaultValue={seed?.effort ?? ""} className={fieldCls}>
                     <option value="">—</option>
                     {efforts.map((e) => (
                       <option key={e} value={e}>
@@ -254,7 +272,7 @@ export function TaskForm({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className={labelCls}>Program<Req /></label>
-                  <select name="program" required defaultValue={task?.program ?? ""} className={fieldCls}>
+                  <select name="program" required defaultValue={seed?.program ?? ""} className={fieldCls}>
                     <option value="">—</option>
                     {allowedPrograms.map((p) => (
                       <option key={p} value={p}>{p}</option>
@@ -263,7 +281,7 @@ export function TaskForm({
                 </div>
                 <div>
                   <label className={labelCls}>Track<Req /></label>
-                  <select name="track" required defaultValue={task?.track ?? ""} className={fieldCls}>
+                  <select name="track" required defaultValue={seed?.track ?? ""} className={fieldCls}>
                     <option value="">—</option>
                     {tracks.map((t) => (
                       <option key={t} value={t}>{t}</option>
@@ -310,7 +328,7 @@ export function TaskForm({
                 <label className={labelCls}>Stakeholders</label>
                 <StakeholderSelect
                   people={people}
-                  defaultSelectedIds={task?.stakeholders?.map((s) => s.id) ?? []}
+                  defaultSelectedIds={seed?.stakeholders?.map((s) => s.id) ?? []}
                 />
               </div>
 
@@ -320,7 +338,7 @@ export function TaskForm({
                 </label>
                 <TagSelect
                   suggestions={allTags}
-                  defaultTags={task?.tags ?? []}
+                  defaultTags={seed?.tags ?? []}
                   allowCreate={canCreateMetrics}
                   placeholder={canCreateMetrics ? "Add tags…" : "Select tags…"}
                 />
@@ -333,7 +351,7 @@ export function TaskForm({
                 </label>
                 <TagSelect
                   suggestions={allMetrics}
-                  defaultTags={task?.metrics ?? []}
+                  defaultTags={seed?.metrics ?? []}
                   fieldName="metrics"
                   placeholder={canCreateMetrics ? "Select or add metrics…" : "Select metrics…"}
                   prefix=""

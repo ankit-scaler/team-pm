@@ -434,7 +434,7 @@ type LogEntry = {
   action: "created" | "updated" | "deleted" | "moved";
   entityType:
     | "task" | "adhoc" | "kr" | "metric" | "tag" | "effort" | "priority"
-    | "membership" | "role" | "user" | "program" | "track" | "impact";
+    | "membership" | "role" | "user" | "program" | "track" | "impact" | "team";
   entityId?: string | null;
   entityLabel?: string | null;
   summary: string;
@@ -1608,4 +1608,143 @@ ${data}`;
     console.error("aiSummarizeImpact: could not parse Gemini output:", raw.slice(0, 500));
     return { error: "Couldn't parse the AI response. Please try again." };
   }
+}
+
+// -----------------------------------------------------------------------------
+//  Teams — admin-created groups with a leader; members join via request/approve.
+// -----------------------------------------------------------------------------
+
+async function teamName(teamId: string): Promise<string> {
+  const admin = createAdminClient();
+  const { data } = await admin.from("teams").select("name").eq("id", teamId).single();
+  return (data?.name as string) ?? "team";
+}
+
+// Admin, or the leader of this specific team.
+async function assertCanManageTeam(teamId: string) {
+  const access = await getMyAccess();
+  if (access.isAdmin || access.ledTeamIds.includes(teamId)) return access;
+  throw new Error("Not allowed");
+}
+
+export async function createTeam(name: string, leaderId: string) {
+  await requireAdmin();
+  const clean = (name ?? "").trim();
+  if (!clean) throw new Error("Team name is required");
+  if (!leaderId) throw new Error("Pick a team leader");
+  const admin = createAdminClient();
+  const { data: team, error } = await admin
+    .from("teams")
+    .insert({ name: clean, leader_id: leaderId })
+    .select("id")
+    .single();
+  if (error) throw new Error(error.message);
+  // The leader is automatically an accepted member.
+  await admin
+    .from("team_members")
+    .upsert({ team_id: team.id, profile_id: leaderId, status: "accepted" }, { onConflict: "team_id,profile_id" });
+  const who = (await nameForProfile(leaderId)) ?? "someone";
+  await logActivity({
+    action: "created",
+    entityType: "team",
+    entityId: team.id,
+    entityLabel: clean,
+    summary: `Created team "${clean}" (leader: ${who})`,
+  });
+  revalidatePath("/teams");
+  revalidatePath("/board");
+  revalidatePath("/tasks");
+}
+
+export async function renameTeam(teamId: string, name: string) {
+  await requireAdmin();
+  const clean = (name ?? "").trim();
+  if (!clean) throw new Error("Team name is required");
+  const admin = createAdminClient();
+  const { error } = await admin.from("teams").update({ name: clean }).eq("id", teamId);
+  if (error) throw new Error(error.message);
+  await logActivity({ action: "updated", entityType: "team", entityId: teamId, entityLabel: clean, summary: `Renamed team to "${clean}"` });
+  revalidatePath("/teams");
+  revalidatePath("/board");
+  revalidatePath("/tasks");
+}
+
+export async function setTeamLeader(teamId: string, leaderId: string) {
+  await requireAdmin();
+  if (!leaderId) throw new Error("Pick a leader");
+  const admin = createAdminClient();
+  const { error } = await admin.from("teams").update({ leader_id: leaderId }).eq("id", teamId);
+  if (error) throw new Error(error.message);
+  // Ensure the new leader is an accepted member.
+  await admin
+    .from("team_members")
+    .upsert({ team_id: teamId, profile_id: leaderId, status: "accepted" }, { onConflict: "team_id,profile_id" });
+  const who = (await nameForProfile(leaderId)) ?? "someone";
+  const tName = await teamName(teamId);
+  await logActivity({ action: "updated", entityType: "team", entityId: teamId, entityLabel: tName, summary: `Made ${who} the leader of "${tName}"` });
+  revalidatePath("/teams");
+  revalidatePath("/board");
+  revalidatePath("/tasks");
+}
+
+export async function deleteTeam(teamId: string) {
+  await requireAdmin();
+  const tName = await teamName(teamId);
+  const admin = createAdminClient();
+  const { error } = await admin.from("teams").delete().eq("id", teamId);
+  if (error) throw new Error(error.message);
+  await logActivity({ action: "deleted", entityType: "team", entityId: teamId, entityLabel: tName, summary: `Deleted team "${tName}"` });
+  revalidatePath("/teams");
+  revalidatePath("/board");
+  revalidatePath("/tasks");
+}
+
+// A user requests to join a team — creates a pending row, never downgrading an
+// existing accepted membership (ignoreDuplicates leaves any existing row alone).
+export async function requestJoinTeam(teamId: string) {
+  const access = await getMyAccess();
+  if (!access.userId) throw new Error("Sign in first");
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("team_members")
+    .upsert(
+      { team_id: teamId, profile_id: access.userId, status: "pending" },
+      { onConflict: "team_id,profile_id", ignoreDuplicates: true }
+    );
+  if (error) throw new Error(error.message);
+  revalidatePath("/join-team");
+  revalidatePath("/teams");
+}
+
+export async function acceptMember(teamId: string, profileId: string) {
+  await assertCanManageTeam(teamId);
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("team_members")
+    .update({ status: "accepted" })
+    .eq("team_id", teamId)
+    .eq("profile_id", profileId);
+  if (error) throw new Error(error.message);
+  const who = (await nameForProfile(profileId)) ?? "someone";
+  const tName = await teamName(teamId);
+  await logActivity({ action: "updated", entityType: "team", entityId: teamId, entityLabel: tName, summary: `Accepted ${who} into "${tName}"` });
+  revalidatePath("/teams");
+  revalidatePath("/board");
+  revalidatePath("/tasks");
+}
+
+// Reject a pending request OR remove an accepted member (both delete the row).
+// The leader can't be removed — reassign the leader first.
+export async function removeMember(teamId: string, profileId: string) {
+  await assertCanManageTeam(teamId);
+  const admin = createAdminClient();
+  const { data: team } = await admin.from("teams").select("leader_id, name").eq("id", teamId).single();
+  if (team?.leader_id === profileId) throw new Error("Reassign the leader before removing them.");
+  const { error } = await admin.from("team_members").delete().eq("team_id", teamId).eq("profile_id", profileId);
+  if (error) throw new Error(error.message);
+  const who = (await nameForProfile(profileId)) ?? "someone";
+  await logActivity({ action: "deleted", entityType: "team", entityId: teamId, entityLabel: team?.name ?? "team", summary: `Removed ${who} from "${team?.name ?? "team"}"` });
+  revalidatePath("/teams");
+  revalidatePath("/board");
+  revalidatePath("/tasks");
 }

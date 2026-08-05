@@ -9,6 +9,7 @@ import {
   getTags,
   getEfforts,
   getPriorities,
+  getTeamsWithMembers,
 } from "@/lib/queries";
 import { getMyAccess } from "@/lib/access";
 import { KanbanBoard } from "../../components/kanban-board";
@@ -18,7 +19,7 @@ import { AdhocForm } from "../../components/adhoc-form";
 export const dynamic = "force-dynamic";
 
 export default async function BoardPage() {
-  const [tasks, people, adhocRequests, access, allMetrics, allPrograms, tracks, tagList, efforts, priorities] =
+  const [tasks, people, adhocRequests, access, allMetrics, allPrograms, tracks, tagList, efforts, priorities, teams] =
     await Promise.all([
       getTasks(),
       getPeople(),
@@ -30,6 +31,7 @@ export default async function BoardPage() {
       getTags(),
       getEfforts(),
       getPriorities(),
+      getTeamsWithMembers(),
     ]);
   const allTags = Array.from(new Set([...tagList, ...distinctTags(tasks)]));
   const allowedPrograms = access.isAdmin ? allPrograms : access.visiblePrograms;
@@ -60,6 +62,7 @@ export default async function BoardPage() {
         userId={access.userId}
         isAdmin={access.isAdmin}
         moPrograms={access.moPrograms}
+        teams={access.isAdmin ? teams : []}
       />
     </div>
   );

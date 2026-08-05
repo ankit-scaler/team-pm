@@ -36,7 +36,9 @@ export default async function AppLayout({
   const access = await getMyAccess();
   const calendarConnected = await isCalendarConnected(user.id);
 
-  // Signed in but not assigned to any program yet — friendly lock screen.
+  // Onboarding order:
+  //   1) PROGRAM access first — a non-admin with no program is asked to be added
+  //      to one before anything else.
   if (access.isPending) {
     return (
       <div className="grid min-h-screen place-items-center px-6">
@@ -59,6 +61,13 @@ export default async function AppLayout({
     );
   }
 
+  //   2) THEN the team gate — once teams exist, a non-admin must be ACCEPTED into
+  //      at least one team. Requested-but-pending users wait on /join-team.
+  if (!access.isAdmin && !access.hasAcceptedTeam) {
+    const { count } = await supabase.from("teams").select("id", { count: "exact", head: true });
+    if ((count ?? 0) > 0) redirect("/join-team");
+  }
+
   return (
     <div className="flex min-h-screen flex-col">
       <Nav
@@ -66,6 +75,7 @@ export default async function AppLayout({
         calendarConnected={calendarConnected}
         isAdmin={access.isAdmin}
         isManager={access.isAdmin || access.moPrograms.length > 0}
+        canManageTeams={access.isAdmin || access.ledTeamIds.length > 0}
       />
       <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6">{children}</main>
       <Footer />

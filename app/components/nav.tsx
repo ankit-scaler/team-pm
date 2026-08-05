@@ -21,11 +21,13 @@ export function Nav({
   calendarConnected = false,
   isAdmin = false,
   isManager = false,
+  canManageTeams = false,
 }: {
   profile: Profile;
   calendarConnected?: boolean;
   isAdmin?: boolean;
   isManager?: boolean;
+  canManageTeams?: boolean;
 }) {
   const pathname = usePathname();
   const [logoOk, setLogoOk] = useState(true);
@@ -33,6 +35,7 @@ export function Nav({
   const links = [...BASE_LINKS];
   const adminLinks = [
     ...(isManager ? [{ href: "/admin", label: "Access" }] : []),
+    ...(canManageTeams ? [{ href: "/teams", label: "Teams" }] : []),
     ...(isAdmin
       ? [
           { href: "/insights", label: "Insights" },

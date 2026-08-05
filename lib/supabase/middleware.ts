@@ -63,5 +63,31 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // Team gate — enforced here (not only in the (app) layout) so it applies to
+  // client-side navigations too: someone removed from all their teams is bounced
+  // to the join screen on their very next request, not just a full reload.
+  // Program-first is preserved: a user with no program is NOT redirected here —
+  // they fall through to the layout's "not in a program yet" screen (this also
+  // avoids a /board ⇄ /join-team redirect loop).
+  if (user && !isPublic && !path.startsWith("/join-team")) {
+    const [roleRes, progRes, acceptedRes, teamsRes] = await Promise.all([
+      supabase.from("profiles").select("role").eq("id", user.id).single(),
+      supabase.from("program_memberships").select("*", { count: "exact", head: true }).eq("profile_id", user.id),
+      // A leader is always an accepted member, so this covers leaders too.
+      supabase.from("team_members").select("*", { count: "exact", head: true }).eq("profile_id", user.id).eq("status", "accepted"),
+      supabase.from("teams").select("*", { count: "exact", head: true }),
+    ]);
+    const isAdmin = roleRes.data?.role === "admin";
+    const hasProgram = (progRes.count ?? 0) > 0;
+    const hasAcceptedTeam = (acceptedRes.count ?? 0) > 0;
+    const teamsExist = (teamsRes.count ?? 0) > 0;
+
+    if (!isAdmin && hasProgram && !hasAcceptedTeam && teamsExist) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/join-team";
+      return NextResponse.redirect(url);
+    }
+  }
+
   return response;
 }
