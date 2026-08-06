@@ -81,16 +81,24 @@ export async function GET(request: Request) {
     const dry = ["1", "true", "yes"].includes((url.searchParams.get("dry") ?? "").toLowerCase());
     const force = ["1", "true", "yes"].includes((url.searchParams.get("force") ?? "").toLowerCase());
 
-    // Anti-spam guard: only ACTUALLY send when this is the real Vercel Cron
-    // (its requests carry a "vercel-cron" user-agent) or when ?force=1 is set.
-    // A casual manual hit just returns a preview — so testing can never DM the
-    // team by accident.
-    const isCron = (request.headers.get("user-agent") ?? "").toLowerCase().includes("vercel-cron");
-    const willSend = !dry && (isCron || force);
-
     const admin = createAdminClient();
     // "Today" in the team's timezone (IST) as YYYY-MM-DD, matched against eta.
     const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
+
+    // Once-per-day guard: the digest goes out at most once per calendar day. The
+    // scheduled cron sends the first run of the day; any repeat/accidental hit
+    // no-ops. ?force bypasses it; ?only sends to one person for testing; ?dry
+    // previews. (Table absent pre-migration -> treated as "not sent yet".)
+    let alreadySentToday = false;
+    if (!dry && !force && !only) {
+      const { data: existing } = await admin
+        .from("reminder_sends")
+        .select("sent_on")
+        .eq("sent_on", today)
+        .maybeSingle();
+      alreadySentToday = !!existing;
+    }
+    const willSend = !dry && (force || !!only || !alreadySentToday);
 
     const { data } = await admin
       .from("tasks")
@@ -122,12 +130,25 @@ export async function GET(request: Request) {
       if (await dmUserByEmail(email, text)) sent++;
     }
 
+    // Record today's send so later runs no-op (full broadcasts only, not ?only tests).
+    if (willSend && !only && !dry) {
+      await admin
+        .from("reminder_sends")
+        .upsert({ sent_on: today }, { onConflict: "sent_on", ignoreDuplicates: true });
+    }
+
     return NextResponse.json({
       ok: true,
       date: today,
       users: byUser.size,
       sent,
-      ...(willSend ? {} : { sentNothing: true, reason: dry ? "dry" : "not the scheduled cron — pass ?force=1 to send", preview }),
+      ...(willSend
+        ? {}
+        : {
+            sentNothing: true,
+            reason: dry ? "dry" : alreadySentToday ? "already sent today" : "nothing to send",
+            preview,
+          }),
     });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
