@@ -28,6 +28,7 @@ export type ImpactRow = {
   taskId: string;
   metric: string;
   assignee: string | null;
+  assigneeId: string | null;
   taskTitle: string;
   description: string | null;
   program: string | null;

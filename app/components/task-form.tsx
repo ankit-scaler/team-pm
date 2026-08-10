@@ -171,10 +171,9 @@ export function TaskForm({
       {open && (
         <div
           className="fixed inset-0 z-40 grid place-items-start overflow-y-auto bg-black/40 p-4 text-left backdrop-blur-sm sm:place-items-center"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setOpen(false);
-          }}
         >
+          {/* Backdrop clicks intentionally do NOT close the form — close with the
+              ✕ button — so a stray click can never wipe what you've typed. */}
           <div className="relative w-full max-w-lg rounded-xl border border-border bg-surface p-5 shadow-xl">
             {pending && (
               <div className="absolute inset-0 z-10 grid place-items-center rounded-xl bg-surface/85 backdrop-blur-sm">

@@ -241,6 +241,7 @@ export async function getImpactRows(): Promise<ImpactRow[]> {
         taskId: t.id,
         metric,
         assignee: t.assignee?.full_name ?? t.assignee?.email ?? null,
+        assigneeId: t.assignee?.id ?? null,
         taskTitle: t.title,
         description: t.description,
         program: t.program ?? null,
