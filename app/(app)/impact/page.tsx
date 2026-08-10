@@ -1,14 +1,15 @@
 import { getMyAccess } from "@/lib/access";
-import { getImpactRows, getImpactStatuses } from "@/lib/queries";
+import { getImpactRows, getImpactStatuses, getTeamsWithMembers } from "@/lib/queries";
 import { ImpactTable } from "../../components/impact-table";
 
 export const dynamic = "force-dynamic";
 
 export default async function ImpactPage() {
-  const [access, rows, statusOptions] = await Promise.all([
+  const [access, rows, statusOptions, teams] = await Promise.all([
     getMyAccess(),
     getImpactRows(),
     getImpactStatuses(),
+    getTeamsWithMembers(),
   ]);
 
   return (
@@ -25,6 +26,7 @@ export default async function ImpactPage() {
         statusOptions={statusOptions}
         isAdmin={access.isAdmin}
         moPrograms={access.moPrograms}
+        teams={access.isAdmin ? teams : []}
       />
     </div>
   );

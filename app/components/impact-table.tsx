@@ -93,11 +93,13 @@ export function ImpactTable({
   statusOptions,
   isAdmin,
   moPrograms,
+  teams = [],
 }: {
   rows: ImpactRow[];
   statusOptions: string[];
   isAdmin: boolean;
   moPrograms: string[];
+  teams?: { id: string; name: string; memberIds: string[] }[];
 }) {
   const [edits, setEdits] = useState<Record<string, Edit>>(() =>
     Object.fromEntries(rows.map((r) => [keyOf(r), toEdit(r)]))
@@ -123,7 +125,13 @@ export function ImpactTable({
   const [assignee, setAssignee] = useState("");
   const [stakeholder, setStakeholder] = useState("");
   const [program, setProgram] = useState(""); // admin-only
+  const [team, setTeam] = useState(""); // admin-only, team id
   const [metric, setMetric] = useState("");
+
+  const teamMemberSet = useMemo(() => {
+    const t = teams.find((x) => x.id === team);
+    return t ? new Set(t.memberIds) : null;
+  }, [teams, team]);
 
   const canEditRow = (r: ImpactRow) =>
     isAdmin || (!!r.program && moPrograms.includes(r.program));
@@ -160,13 +168,14 @@ export function ImpactTable({
         if (assignee && r.assignee !== assignee) return false;
         if (stakeholder && !r.stakeholders.includes(stakeholder)) return false;
         if (isAdmin && program && r.program !== program) return false;
+        if (isAdmin && teamMemberSet && !(r.assigneeId && teamMemberSet.has(r.assigneeId))) return false;
         if (metric && r.metric !== metric) return false;
         return true;
       }),
-    [rows, month, from, to, assignee, stakeholder, program, metric, isAdmin]
+    [rows, month, from, to, assignee, stakeholder, program, teamMemberSet, metric, isAdmin]
   );
 
-  const anyFilter = month || from || to || assignee || stakeholder || (isAdmin && program) || metric;
+  const anyFilter = month || from || to || assignee || stakeholder || (isAdmin && (program || team)) || metric;
 
   // Group a task's metric-rows together so task info shows once per task.
   const groups = useMemo(() => {
@@ -188,9 +197,10 @@ export function ImpactTable({
     if (assignee) f.push(assignee);
     if (stakeholder) f.push(`stakeholder: ${stakeholder}`);
     if (isAdmin && program) f.push(program);
+    if (isAdmin && team) f.push(`team: ${teams.find((t) => t.id === team)?.name ?? team}`);
     if (metric) f.push(metric);
     return f;
-  }, [month, from, to, assignee, stakeholder, program, metric, isAdmin]);
+  }, [month, from, to, assignee, stakeholder, program, team, teams, metric, isAdmin]);
 
   // Roll up the currently-visible (filtered) rows into a readable summary,
   // grouped by PROGRAM: each program gets its own status counts + task changes.
@@ -354,6 +364,14 @@ export function ImpactTable({
             ))}
           </select>
         )}
+        {isAdmin && teams.length > 0 && (
+          <select value={team} onChange={(e) => setTeam(e.target.value)} title="Filter by team" className={`${selCls} py-1.5`}>
+            <option value="">All teams</option>
+            {teams.map((t) => (
+              <option key={t.id} value={t.id}>{t.name}</option>
+            ))}
+          </select>
+        )}
         {metricOptions.length > 0 && (
           <select value={metric} onChange={(e) => setMetric(e.target.value)} className={`${selCls} py-1.5`}>
             <option value="">All metrics</option>
@@ -365,7 +383,7 @@ export function ImpactTable({
         {anyFilter && (
           <button
             type="button"
-            onClick={() => { setMonth(""); setFrom(""); setTo(""); setAssignee(""); setStakeholder(""); setProgram(""); setMetric(""); }}
+            onClick={() => { setMonth(""); setFrom(""); setTo(""); setAssignee(""); setStakeholder(""); setProgram(""); setTeam(""); setMetric(""); }}
             className="text-xs text-accent hover:underline"
           >
             Clear
