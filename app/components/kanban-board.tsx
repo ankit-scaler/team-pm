@@ -79,7 +79,9 @@ export function KanbanBoard({
   const [delivering, setDelivering] = useState<Task | null>(null);
   const [startingEta, setStartingEta] = useState<Task | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [assignee, setAssignee] = useState("");
+  // Default the person filter to the signed-in user (their own tasks); they can
+  // switch to "Everyone" or anyone else from the dropdown.
+  const [assignee, setAssignee] = useState(userId ?? "");
 
   // Who can move a card: admins, its assignee, or an MO of its program.
   const canMoveTask = (t: Task) =>
