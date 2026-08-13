@@ -177,6 +177,9 @@ export function ImpactTable({
 
   const anyFilter = month || from || to || assignee || stakeholder || (isAdmin && (program || team)) || metric;
 
+  // Distinct completed tasks across all rows (each row is one task×metric).
+  const totalTasks = useMemo(() => new Set(rows.map((r) => r.taskId)).size, [rows]);
+
   // Group a task's metric-rows together so task info shows once per task.
   const groups = useMemo(() => {
     const m = new Map<string, ImpactRow[]>();
@@ -396,7 +399,9 @@ export function ImpactTable({
         >
           <Sparkles size={14} /> AI summary
         </button>
-        <span className="text-xs text-muted">{visible.length} of {rows.length}</span>
+        <span className="text-xs text-muted">
+          {groups.length} of {totalTasks} task{totalTasks === 1 ? "" : "s"}
+        </span>
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-border bg-surface">
