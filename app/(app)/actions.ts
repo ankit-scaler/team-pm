@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
-import { notifyStatusChange, postTaskCreatedInThread } from "@/lib/slack";
+import { notifyStatusChange, notifyTaskRaisedFromSlack } from "@/lib/slack";
 import { syncTaskCalendarEvent, deleteTaskCalendarEvent } from "@/lib/google";
 import { getMyAccess } from "@/lib/access";
 import type { MembershipRole } from "@/lib/access";
@@ -689,7 +689,7 @@ export async function createTask(formData: FormData) {
   // it's assigned to (@-mentioning both). Best-effort.
   const slackLink = str(formData.get("slack_link"));
   if (slackLink && formData.get("from_slack") === "1") {
-    await postTaskCreatedInThread({
+    await notifyTaskRaisedFromSlack({
       slackLink,
       taskTitle: task.title,
       creatorName: me.name,

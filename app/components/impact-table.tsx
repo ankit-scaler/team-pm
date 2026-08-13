@@ -404,13 +404,14 @@ export function ImpactTable({
         </span>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-border bg-surface">
+      <div className="max-h-[70vh] overflow-auto rounded-xl border border-border bg-surface">
         <table className="w-full min-w-[880px] text-left text-xs">
           <thead className="sticky top-0 z-10 bg-surface-2 uppercase tracking-wide text-muted shadow-sm">
             <tr>
               <th className="px-3 py-2.5 font-semibold">Name</th>
               <th className="px-3 py-2.5 font-semibold">Task</th>
               <th className="px-3 py-2.5 font-semibold">Description</th>
+              <th className="px-3 py-2.5 font-semibold">Delivered</th>
               <th className="px-3 py-2.5 font-semibold">Metric</th>
               <th className="px-3 py-2.5 font-semibold">Type</th>
               <th className="px-3 py-2.5 font-semibold">Pre value</th>
@@ -423,7 +424,7 @@ export function ImpactTable({
           <tbody>
             {visible.length === 0 && (
               <tr>
-                <td colSpan={10} className="px-3 py-10 text-center text-muted">
+                <td colSpan={11} className="px-3 py-10 text-center text-muted">
                   No completed tasks with metrics match these filters.
                 </td>
               </tr>
@@ -458,6 +459,9 @@ export function ImpactTable({
                         ) : (
                           "—"
                         )}
+                      </td>
+                      <td rowSpan={group.length} className="whitespace-nowrap px-3 py-2 text-muted">
+                        {fmtDate(r.deliveredDate)}
                       </td>
                     </>
                   )}

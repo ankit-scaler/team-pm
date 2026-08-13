@@ -135,18 +135,20 @@ async function slackUserIdByEmail(email: string | null | undefined): Promise<str
 
 // When a task is raised from a Slack message, reply IN THAT THREAD noting who
 // created it and who it was assigned to, @-mentioning both when resolvable.
-// Best-effort (never throws); needs the bot to be a member of that channel.
-export async function postTaskCreatedInThread(opts: {
+//
+// Tries to reply IN THE SOURCE THREAD (works in channels the bot is a member of).
+// If it can't post there — e.g. the task was raised from a DM between two people,
+// or a channel the bot isn't in — it FALLS BACK to DMing the creator + assignee
+// directly, with a link back to the source message. Best-effort (never throws).
+export async function notifyTaskRaisedFromSlack(opts: {
   slackLink: string;
   taskTitle: string;
   creatorName: string;
   creatorEmail?: string | null;
   assigneeName?: string | null;
   assigneeEmail?: string | null;
-}): Promise<boolean> {
-  if (!botToken()) return false;
-  const parsed = parseSlackPermalink(opts.slackLink);
-  if (!parsed) return false;
+}): Promise<void> {
+  if (!botToken()) return;
   try {
     const [creatorId, assigneeId] = await Promise.all([
       slackUserIdByEmail(opts.creatorEmail),
@@ -158,16 +160,30 @@ export async function postTaskCreatedInThread(opts: {
         ? `<@${assigneeId}>`
         : `*${opts.assigneeName}*`
       : "_unassigned_";
-    const res = await slackApi("chat.postMessage", {
-      channel: parsed.channel,
-      thread_ts: parsed.ts,
-      text: `✅ Task created from this message: *${opts.taskTitle}*\n${creator} assigned it to ${assignee}.`,
-      unfurl_links: false,
-      unfurl_media: false,
-    });
-    return Boolean(res?.ok);
+
+    // 1) Preferred: reply in the source message's thread.
+    const parsed = parseSlackPermalink(opts.slackLink);
+    if (parsed) {
+      const res = await slackApi("chat.postMessage", {
+        channel: parsed.channel,
+        thread_ts: parsed.ts,
+        text: `✅ Task created from this message: *${opts.taskTitle}*\n${creator} assigned it to ${assignee}.`,
+        unfurl_links: false,
+        unfurl_media: false,
+      });
+      if (res?.ok) return; // posted in the thread — done.
+    }
+
+    // 2) Fallback (DM source / bot not in channel): DM the people directly.
+    const dmText =
+      `🆕 A task was created from a Slack message: *${opts.taskTitle}*\n` +
+      `${creator} assigned it to ${assignee}.\n${opts.slackLink}`;
+    const targets = Array.from(new Set([creatorId, assigneeId].filter(Boolean) as string[]));
+    for (const uid of targets) {
+      await slackApi("chat.postMessage", { channel: uid, text: dmText, unfurl_links: false });
+    }
   } catch {
-    return false;
+    /* best-effort — never blocks task creation */
   }
 }
 
