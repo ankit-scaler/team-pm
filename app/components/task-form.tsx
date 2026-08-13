@@ -51,19 +51,28 @@ export function TaskForm({
   // program, track, tags, metrics, stakeholders). ETA / links / status are NOT
   // seeded from here, so a duplicate starts fresh on those.
   const seed = task ?? duplicateFrom;
-  const [prefill, setPrefill] = useState<{ title?: string; description?: string; slackLink?: string }>({});
+  const [prefill, setPrefill] = useState<{
+    title?: string;
+    description?: string;
+    slackLink?: string;
+    fromSlack?: boolean; // opened via the Slack "create task" shortcut
+  }>({});
 
   // Prefill + auto-open the New-task form from URL params — e.g. a link shared
   // from Slack: /tasks?description=…&slack_link=…. Runs once, then strips the
   // query so a refresh doesn't reopen it.
   useEffect(() => {
-    if (isEdit) return;
+    // Only the real "New task" form reads the URL prefill — not edit or the
+    // per-row Duplicate forms (which would otherwise all pop open at once).
+    if (isEdit || duplicateFrom) return;
     const params = new URLSearchParams(window.location.search);
     const description = params.get("description") ?? undefined;
     const title = params.get("title") ?? undefined;
     const slackLink = params.get("slack_link") ?? undefined;
     if (!description && !title && !slackLink) return;
-    setPrefill({ title, description, slackLink });
+    // A slack_link in the URL means this came from the Slack shortcut, so the
+    // link is the SOURCE message — used to reply in that thread on create.
+    setPrefill({ title, description, slackLink, fromSlack: !!slackLink });
     setOpen(true);
     window.history.replaceState(null, "", window.location.pathname);
   }, [isEdit]);
@@ -118,6 +127,7 @@ export function TaskForm({
           return;
         }
         setOpen(false);
+        setPrefill({}); // clear so a later New-task doesn't reuse the Slack source
       } catch (err) {
         setError(err instanceof Error ? err.message : "Something went wrong");
       }
@@ -184,7 +194,7 @@ export function TaskForm({
               <h2 className="text-base font-semibold">{isEdit ? "Edit task" : duplicateFrom ? "Duplicate task" : "New task"}</h2>
               <button
                 type="button"
-                onClick={() => setOpen(false)}
+                onClick={() => { setOpen(false); setPrefill({}); }}
                 className="grid h-8 w-8 place-items-center rounded-md text-muted hover:bg-bg hover:text-fg"
                 aria-label="Close"
               >
@@ -193,6 +203,7 @@ export function TaskForm({
             </div>
 
             <form onSubmit={onSubmit} className="space-y-3">
+              {prefill.fromSlack && <input type="hidden" name="from_slack" value="1" />}
               <div>
                 <label className={labelCls}>Title<Req /></label>
                 <input

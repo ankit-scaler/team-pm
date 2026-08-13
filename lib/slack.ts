@@ -108,6 +108,69 @@ export async function dmUserByEmail(email: string, text: string): Promise<boolea
   }
 }
 
+// Parse a Slack message permalink into { channel, ts } for a threaded reply.
+//   …/archives/<C>/p<16 digits>            → top-level message: reply under it.
+//   …/archives/<C>/p<...>?thread_ts=<root> → a reply inside a thread: reply under
+//                                            the ROOT so we land in that thread
+//                                            (Slack rejects/mis-threads a reply's ts).
+function parseSlackPermalink(link: string): { channel: string; ts: string } | null {
+  const m = link.match(/\/archives\/([A-Z0-9]+)\/p(\d{16,})/i);
+  if (!m) return null;
+  const channel = m[1];
+  const digits = m[2];
+  const msgTs = `${digits.slice(0, 10)}.${digits.slice(10)}`;
+  const threadRoot = link.match(/[?&]thread_ts=([\d.]+)/);
+  return { channel, ts: threadRoot ? threadRoot[1] : msgTs };
+}
+
+async function slackUserIdByEmail(email: string | null | undefined): Promise<string | null> {
+  if (!email) return null;
+  try {
+    const r = await slackGet("users.lookupByEmail", { email });
+    return (r?.user?.id as string) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// When a task is raised from a Slack message, reply IN THAT THREAD noting who
+// created it and who it was assigned to, @-mentioning both when resolvable.
+// Best-effort (never throws); needs the bot to be a member of that channel.
+export async function postTaskCreatedInThread(opts: {
+  slackLink: string;
+  taskTitle: string;
+  creatorName: string;
+  creatorEmail?: string | null;
+  assigneeName?: string | null;
+  assigneeEmail?: string | null;
+}): Promise<boolean> {
+  if (!botToken()) return false;
+  const parsed = parseSlackPermalink(opts.slackLink);
+  if (!parsed) return false;
+  try {
+    const [creatorId, assigneeId] = await Promise.all([
+      slackUserIdByEmail(opts.creatorEmail),
+      slackUserIdByEmail(opts.assigneeEmail),
+    ]);
+    const creator = creatorId ? `<@${creatorId}>` : `*${opts.creatorName}*`;
+    const assignee = opts.assigneeName
+      ? assigneeId
+        ? `<@${assigneeId}>`
+        : `*${opts.assigneeName}*`
+      : "_unassigned_";
+    const res = await slackApi("chat.postMessage", {
+      channel: parsed.channel,
+      thread_ts: parsed.ts,
+      text: `✅ Task created from this message: *${opts.taskTitle}*\n${creator} assigned it to ${assignee}.`,
+      unfurl_links: false,
+      unfurl_media: false,
+    });
+    return Boolean(res?.ok);
+  } catch {
+    return false;
+  }
+}
+
 async function getChannelMembers(channel: string): Promise<Member[]> {
   if (membersCache && membersCache.channel === channel && Date.now() - membersCache.at < MEMBERS_TTL) {
     return membersCache.members;

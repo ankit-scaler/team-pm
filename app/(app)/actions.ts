@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
-import { notifyStatusChange } from "@/lib/slack";
+import { notifyStatusChange, postTaskCreatedInThread } from "@/lib/slack";
 import { syncTaskCalendarEvent, deleteTaskCalendarEvent } from "@/lib/google";
 import { getMyAccess } from "@/lib/access";
 import type { MembershipRole } from "@/lib/access";
@@ -405,6 +405,7 @@ async function currentProfile() {
   return {
     id: user.id,
     name: data?.full_name ?? data?.email ?? user.email ?? "Someone",
+    email: data?.email ?? user.email ?? null,
   };
 }
 
@@ -659,9 +660,10 @@ export async function createTask(formData: FormData) {
     }
   }
 
-  // Look up assignee name for the Slack message (if assigned to someone)
+  // Look up assignee name/email for the Slack message (if assigned to someone)
   const assigneeId = str(formData.get("assignee_id"));
   let assigneeName: string | null = null;
+  let assigneeEmail: string | null = null;
   if (assigneeId) {
     const { data: assignee } = await supabase
       .from("profiles")
@@ -669,6 +671,7 @@ export async function createTask(formData: FormData) {
       .eq("id", assigneeId)
       .single();
     assigneeName = assignee?.full_name ?? assignee?.email ?? null;
+    assigneeEmail = assignee?.email ?? null;
   }
 
   await notifyStatusChange({
@@ -680,6 +683,21 @@ export async function createTask(formData: FormData) {
     assigneeName,
     appUrl: appUrl(),
   });
+
+  // If this task was raised from a Slack message (the "from_slack" marker set by
+  // the shortcut prefill), reply in that thread noting who created it and who
+  // it's assigned to (@-mentioning both). Best-effort.
+  const slackLink = str(formData.get("slack_link"));
+  if (slackLink && formData.get("from_slack") === "1") {
+    await postTaskCreatedInThread({
+      slackLink,
+      taskTitle: task.title,
+      creatorName: me.name,
+      creatorEmail: me.email,
+      assigneeName,
+      assigneeEmail,
+    });
+  }
 
   await logActivity(
     {
