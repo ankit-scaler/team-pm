@@ -214,7 +214,7 @@ export async function getImpactRows(): Promise<ImpactRow[]> {
   let tq = supabase
     .from("tasks")
     .select(
-      `id, title, description, program, delivered_date, metrics,
+      `id, title, description, program, delivered_date, metrics, slack_link, sheet_link,
        assignee:profiles!tasks_assignee_id_fkey (${PROFILE_COLS}),
        task_stakeholders ( profile:profiles!task_stakeholders_profile_id_fkey (${PROFILE_COLS}) )`
     )
@@ -246,6 +246,8 @@ export async function getImpactRows(): Promise<ImpactRow[]> {
         description: t.description,
         program: t.program ?? null,
         deliveredDate: t.delivered_date ?? null,
+        slackLink: t.slack_link ?? null,
+        sheetLink: t.sheet_link ?? null,
         stakeholders,
         metricType: r?.metric_type ?? null,
         preLabel: r?.pre_label ?? null,

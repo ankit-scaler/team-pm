@@ -33,6 +33,8 @@ export type ImpactRow = {
   description: string | null;
   program: string | null;
   deliveredDate: string | null;
+  slackLink: string | null;
+  sheetLink: string | null;
   stakeholders: string[];
   metricType: string | null;
   preLabel: string | null;
