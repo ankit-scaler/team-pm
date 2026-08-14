@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState, useTransition } from "react";
-import { Loader2, X, Sparkles, TrendingUp, AlertTriangle } from "lucide-react";
+import { Loader2, X, Sparkles, TrendingUp, AlertTriangle, MessageSquare, FileSpreadsheet } from "lucide-react";
 import { upsertMetricImpact, aiSummarizeImpact } from "../(app)/actions";
 import { METRIC_TYPES, type ImpactRow, type AiImpactSummary } from "@/lib/types";
 
@@ -38,7 +38,7 @@ type ComputedSummary = {
   programs: ProgramSummary[];
 };
 
-const selCls = "rounded-md border border-border bg-surface px-2 py-1 text-xs text-fg outline-none focus:border-accent";
+const selCls = "max-w-full rounded-md border border-border bg-surface px-2 py-1 text-xs text-fg outline-none focus:border-accent";
 const inCls = "w-full rounded-md border border-border bg-surface px-2 py-1 text-xs text-fg outline-none focus:border-accent";
 const openCalendar = (e: React.MouseEvent<HTMLInputElement>) => (e.currentTarget as any).showPicker?.();
 
@@ -404,8 +404,21 @@ export function ImpactTable({
         </span>
       </div>
 
-      <div className="max-h-[70vh] overflow-auto rounded-xl border border-border bg-surface">
-        <table className="w-full min-w-[880px] text-left text-xs">
+      <div className="max-h-[70vh] overflow-y-auto rounded-xl border border-border bg-surface">
+        <table className="w-full table-fixed text-left text-xs">
+          <colgroup>
+            <col className="w-[9%]" />{/* Name */}
+            <col className="w-[12%]" />{/* Task */}
+            <col className="w-[11%]" />{/* Description */}
+            <col className="w-[6%]" />{/* Delivered */}
+            <col className="w-[8%]" />{/* Metric */}
+            <col className="w-[7%]" />{/* Type */}
+            <col className="w-[11%]" />{/* Pre value */}
+            <col className="w-[11%]" />{/* Post value */}
+            <col className="w-[12%]" />{/* Status */}
+            <col className="w-[9%]" />{/* Last edited */}
+            <col className="w-[4%]" />{/* Save */}
+          </colgroup>
           <thead className="sticky top-0 z-10 bg-surface-2 uppercase tracking-wide text-muted shadow-sm">
             <tr>
               <th className="px-3 py-2.5 font-semibold">Name</th>
@@ -443,7 +456,31 @@ export function ImpactTable({
                   {i === 0 && (
                     <>
                       <td rowSpan={group.length} className="px-3 py-2 font-medium text-fg/80">
-                        {r.assignee ?? "—"}
+                        <div>{r.assignee ?? "—"}</div>
+                        {(r.slackLink || r.sheetLink) && (
+                          <div className="mt-1.5 flex items-center gap-3">
+                            {r.slackLink && (
+                              <a
+                                href={r.slackLink}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-[11px] font-medium text-accent hover:underline"
+                              >
+                                <MessageSquare size={11} /> Slack
+                              </a>
+                            )}
+                            {r.sheetLink && (
+                              <a
+                                href={r.sheetLink}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-[11px] font-medium text-accent hover:underline"
+                              >
+                                <FileSpreadsheet size={11} /> Sheet
+                              </a>
+                            )}
+                          </div>
+                        )}
                       </td>
                       <td rowSpan={group.length} className="px-3 py-2 font-semibold text-fg">
                         {r.taskTitle}
