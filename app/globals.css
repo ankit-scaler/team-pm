@@ -72,3 +72,35 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .dark input[type="date"]::-webkit-calendar-picker-indicator {
   filter: invert(0.8);
 }
+
+/* Route loader: a little plane takes off down the runway.
+   The lucide Plane icon points up-right, so offset-rotate adds 45deg to keep
+   its nose aligned with the flight path. Color comes from text-accent. */
+.plane-runway {
+  position: relative;
+  height: 90px;
+  width: 560px;
+  max-width: 100%;
+  overflow: hidden;
+}
+.plane {
+  position: absolute;
+  offset-path: path("M0,75 Q280,75 560,10");
+  offset-rotate: auto 45deg;
+  animation: takeoff 3s ease-in-out infinite;
+}
+@keyframes takeoff {
+  0%   { offset-distance: 0%;   opacity: 0; }
+  15%  { opacity: 1; }
+  85%  { opacity: 1; }
+  100% { offset-distance: 100%; opacity: 0; }
+}
+
+/* Reduced motion: park the plane mid-runway, no flight. */
+@media (prefers-reduced-motion: reduce) {
+  .plane {
+    animation: none;
+    offset-distance: 50%;
+    opacity: 1;
+  }
+}
