@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, MessageSquare, FileSpreadsheet, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { changeStatus, changeAdhocStatus, deliverTask, startWorking } from "../(app)/actions";
@@ -106,6 +106,31 @@ export function KanbanBoard({
   const [metric, setMetric] = useState("");
   const [etaFrom, setEtaFrom] = useState(""); // YYYY-MM-DD, matched against ETA
   const [etaTo, setEtaTo] = useState("");
+
+  // Deep-link from the Impact page: /board?task=<id> reveals that card here.
+  const searchParams = useSearchParams();
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+
+  // On arrival with ?task=<id>, drop the default person filter (so the card is
+  // visible whoever owns it), flag it for highlight, and strip the param so a
+  // refresh doesn't re-trigger.
+  useEffect(() => {
+    const target = searchParams.get("task");
+    if (!target) return;
+    setAssignee("");
+    setHighlightId(target);
+    router.replace("/board", { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Once the highlighted card is rendered, scroll it into view and fade the ring.
+  useEffect(() => {
+    if (!highlightId) return;
+    const el = document.getElementById(`task-${highlightId}`);
+    el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    const t = setTimeout(() => setHighlightId(null), 3000);
+    return () => clearTimeout(t);
+  }, [highlightId]);
 
   // Clear the per-card spinner once the move's server action settles.
   useEffect(() => {
@@ -408,10 +433,14 @@ export function KanbanBoard({
                 {items.map((t) => {
                   const moving = isPending && movingId === t.id;
                   const isExpanded = expanded.has(t.id);
+                  const highlighted = highlightId === t.id;
                   return (
                   <article
                     key={t.id}
-                    className={`group relative rounded-lg border border-l-[3px] border-border ${STAGE_ACCENT[col]} bg-surface p-3.5 shadow-sm transition-shadow hover:shadow-md`}
+                    id={`task-${t.id}`}
+                    className={`group relative scroll-mt-24 rounded-lg border border-l-[3px] border-border ${STAGE_ACCENT[col]} bg-surface p-3.5 shadow-sm transition-shadow hover:shadow-md ${
+                      highlighted ? "ring-2 ring-accent ring-offset-2 ring-offset-surface" : ""
+                    }`}
                   >
                     {moving && (
                       <div className="absolute inset-0 z-10 grid place-items-center rounded-lg bg-surface/60 backdrop-blur-[1px]">
