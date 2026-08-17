@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useRef, useState, useTransition } from "react";
 import { Loader2, X, Sparkles, TrendingUp, AlertTriangle, MessageSquare, FileSpreadsheet } from "lucide-react";
 import { upsertMetricImpact, aiSummarizeImpact } from "../(app)/actions";
@@ -483,7 +484,13 @@ export function ImpactTable({
                         )}
                       </td>
                       <td rowSpan={group.length} className="px-3 py-2 font-semibold text-fg">
-                        {r.taskTitle}
+                        <Link
+                          href={`/board?task=${r.taskId}`}
+                          title="Open this task on the Board"
+                          className="text-accent hover:underline"
+                        >
+                          {r.taskTitle}
+                        </Link>
                       </td>
                       <td rowSpan={group.length} className="max-w-[150px] px-3 py-2 text-muted">
                         {r.description ? (
