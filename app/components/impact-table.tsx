@@ -39,7 +39,10 @@ type ComputedSummary = {
   programs: ProgramSummary[];
 };
 
-const selCls = "w-full min-w-0 rounded-md border border-border bg-surface px-2 py-1 text-xs text-fg outline-none focus:border-accent";
+const selCls = "max-w-full rounded-md border border-border bg-surface px-2 py-1 text-xs text-fg outline-none focus:border-accent";
+// In-table selects fill their column; the filter-bar ones must keep their natural
+// width or they each wrap onto their own row.
+const tableSelCls = `${selCls} w-full min-w-0`;
 const inCls = "w-full min-w-0 rounded-md border border-border bg-surface px-2 py-1 text-xs text-fg outline-none focus:border-accent";
 const openCalendar = (e: React.MouseEvent<HTMLInputElement>) => (e.currentTarget as any).showPicker?.();
 
@@ -408,20 +411,22 @@ export function ImpactTable({
       <div className="max-h-[70vh] overflow-y-auto overflow-x-hidden rounded-xl border border-border bg-surface">
         <table className="w-full table-fixed text-left text-xs">
           <colgroup>
-            {/* Widths measured against real content: the two selects need ~100px to
-                show "Non-Tangible" / "To be updated", and "Delivered" / "Last edited"
-                are sized by their own headers rather than their dates. */}
-            <col className="w-[9%]" />{/* Name */}
-            <col className="w-[12%]" />{/* Task */}
-            <col className="w-[9%]" />{/* Description */}
-            <col className="w-[8%]" />{/* Delivered */}
+            {/* Widths measured against real rendered text in Plus Jakarta Sans, at the
+                1232px the max-w-7xl shell gives this table:
+                  Type   needs 129px ("Non-Tangible")   Status needs 134px ("To be updated")
+                  Name   needs 114px (Slack+Sheet row)  Delivered/Last edited: 88/97px
+                Everything fits without a horizontal scrollbar. */}
+            <col className="w-[9.5%]" />{/* Name */}
+            <col className="w-[10.5%]" />{/* Task */}
+            <col className="w-[8.5%]" />{/* Description */}
+            <col className="w-[7.5%]" />{/* Delivered */}
             <col className="w-[7%]" />{/* Metric */}
-            <col className="w-[10%]" />{/* Type */}
-            <col className="w-[10%]" />{/* Pre value */}
-            <col className="w-[10%]" />{/* Post value */}
-            <col className="w-[10%]" />{/* Status */}
-            <col className="w-[9%]" />{/* Last edited */}
-            <col className="w-[6%]" />{/* Save */}
+            <col className="w-[11%]" />{/* Type */}
+            <col className="w-[10.5%]" />{/* Pre value */}
+            <col className="w-[10.5%]" />{/* Post value */}
+            <col className="w-[11.5%]" />{/* Status */}
+            <col className="w-[8%]" />{/* Last edited */}
+            <col className="w-[5.5%]" />{/* Save */}
           </colgroup>
           <thead className="sticky top-0 z-10 bg-surface-2 uppercase tracking-wide text-muted shadow-sm">
             <tr>
@@ -459,7 +464,7 @@ export function ImpactTable({
                 <tr key={key} className={`align-top ${zebra} ${rowBorder}`}>
                   {i === 0 && (
                     <>
-                      <td rowSpan={group.length} className="px-2.5 py-2 font-medium text-fg/80 [overflow-wrap:anywhere]">
+                      <td rowSpan={group.length} className="px-2.5 py-2 font-medium text-fg/80 break-words">
                         <div>{r.assignee ?? "—"}</div>
                         {(r.slackLink || r.sheetLink) && (
                           <div className="mt-1.5 flex items-center gap-2">
@@ -468,7 +473,7 @@ export function ImpactTable({
                                 href={r.slackLink}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 text-[11px] font-medium text-accent hover:underline"
+                                className="inline-flex items-center gap-1 whitespace-nowrap text-[11px] font-medium text-accent hover:underline"
                               >
                                 <MessageSquare size={11} /> Slack
                               </a>
@@ -478,7 +483,7 @@ export function ImpactTable({
                                 href={r.sheetLink}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 text-[11px] font-medium text-accent hover:underline"
+                                className="inline-flex items-center gap-1 whitespace-nowrap text-[11px] font-medium text-accent hover:underline"
                               >
                                 <FileSpreadsheet size={11} /> Sheet
                               </a>
@@ -486,7 +491,7 @@ export function ImpactTable({
                           </div>
                         )}
                       </td>
-                      <td rowSpan={group.length} className="px-2.5 py-2 font-semibold text-fg [overflow-wrap:anywhere]">
+                      <td rowSpan={group.length} className="px-2.5 py-2 font-semibold text-fg break-words">
                         <Link
                           href={`/board?task=${r.taskId}`}
                           title="Open this task on the Board"
@@ -495,7 +500,7 @@ export function ImpactTable({
                           {r.taskTitle}
                         </Link>
                       </td>
-                      <td rowSpan={group.length} className="px-2.5 py-2 text-muted [overflow-wrap:anywhere]">
+                      <td rowSpan={group.length} className="px-2.5 py-2 text-muted break-words">
                         {r.description ? (
                           <div className="group relative">
                             <div className="line-clamp-3 cursor-default">{r.description}</div>
@@ -512,12 +517,12 @@ export function ImpactTable({
                       </td>
                     </>
                   )}
-                  <td className="px-2.5 py-2 font-medium text-fg/80 [overflow-wrap:anywhere]">{r.metric}</td>
+                  <td className="px-2.5 py-2 font-medium text-fg/80 break-words">{r.metric}</td>
 
                   {/* Metric type */}
                   <td className="px-2.5 py-2">
                     {editable ? (
-                      <select value={e.metricType} onChange={(ev) => setField(key, "metricType", ev.target.value)} className={selCls}>
+                      <select value={e.metricType} onChange={(ev) => setField(key, "metricType", ev.target.value)} className={tableSelCls}>
                         <option value="">—</option>
                         {METRIC_TYPES.map((t) => (
                           <option key={t} value={t}>{t}</option>
@@ -566,7 +571,7 @@ export function ImpactTable({
                         onChange={(ev) => setField(key, "status", ev.target.value)}
                         disabled={!hasPost}
                         title={hasPost ? undefined : "Fill the post value to set a status"}
-                        className={`${selCls} ${hasPost ? "" : "cursor-not-allowed opacity-60"}`}
+                        className={`${tableSelCls} ${hasPost ? "" : "cursor-not-allowed opacity-60"}`}
                       >
                         {hasPost ? (
                           statusOptions.map((s) => (
@@ -819,7 +824,7 @@ function ValueCell({
         </div>
       ) : (
         <div className="flex items-start gap-1">
-          <span className="min-w-0 [overflow-wrap:anywhere] text-fg/80">
+          <span className="min-w-0 break-words text-fg/80">
             {label || value ? `${label || "—"}: ${value || "—"}` : "—"}
           </span>
           {noteButton}
