@@ -403,6 +403,52 @@ export async function notifyStatusChange(p: StatusChangePayload): Promise<void> 
   await deliver(text, { link, tagNames });
 }
 
+type TaskDeletedPayload = {
+  creatorEmail: string;
+  taskTitle: string;
+  actorName: string;
+  actorIsAssignee: boolean;
+  assigneeName?: string | null;
+  program?: string | null;
+  eta?: string | null;
+  status?: string | null;
+  appUrl?: string;
+};
+
+// DM the person who raised a task when SOMEONE ELSE deletes it — the common case
+// being the assignee deleting work that was assigned to them. Best-effort: a Slack
+// failure must never fail the delete the user already confirmed.
+export async function notifyTaskDeleted(p: TaskDeletedPayload): Promise<void> {
+  if (!p.creatorEmail) return;
+
+  // Assignee deleting their own assigned work reads best with the task named in
+  // the first clause; anyone else (admin / module owner) needs the assignee named
+  // separately, since they aren't the same person.
+  const headline = p.actorIsAssignee
+    ? `🗑️ *${p.actorName}*, who was assigned to *${p.taskTitle}*, deleted the task.`
+    : `🗑️ *${p.actorName}* deleted the task *${p.taskTitle}*.`;
+  const details = [
+    p.assigneeName && !p.actorIsAssignee ? `Assigned to: ${p.assigneeName}` : null,
+    p.program ? `Program: ${p.program}` : null,
+    p.status ? `Status when deleted: ${p.status}` : null,
+    p.eta ? `ETA was: ${p.eta}` : null,
+  ].filter(Boolean);
+
+  const text = [
+    headline,
+    ...details,
+    p.appUrl ? `\n<${p.appUrl}/tasks|Open Team PM>` : null,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  try {
+    await dmUserByEmail(p.creatorEmail, text);
+  } catch (e) {
+    console.error("Slack task-deleted DM failed:", e);
+  }
+}
+
 type OverdueItem = { title: string; eta: string; assignee: string | null };
 
 export async function notifyOverdue(items: OverdueItem[], appUrl?: string): Promise<void> {
