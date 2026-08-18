@@ -421,9 +421,12 @@ type TaskDeletedPayload = {
 export async function notifyTaskDeleted(p: TaskDeletedPayload): Promise<void> {
   if (!p.creatorEmail) return;
 
-  const who = p.actorIsAssignee
-    ? `*${p.actorName}*, who it was assigned to,`
-    : `*${p.actorName}*`;
+  // Assignee deleting their own assigned work reads best with the task named in
+  // the first clause; anyone else (admin / module owner) needs the assignee named
+  // separately, since they aren't the same person.
+  const headline = p.actorIsAssignee
+    ? `🗑️ *${p.actorName}*, who was assigned to *${p.taskTitle}*, deleted the task.`
+    : `🗑️ *${p.actorName}* deleted the task *${p.taskTitle}*.`;
   const details = [
     p.assigneeName && !p.actorIsAssignee ? `Assigned to: ${p.assigneeName}` : null,
     p.program ? `Program: ${p.program}` : null,
@@ -432,7 +435,7 @@ export async function notifyTaskDeleted(p: TaskDeletedPayload): Promise<void> {
   ].filter(Boolean);
 
   const text = [
-    `🗑️ ${who} deleted a task you raised: *${p.taskTitle}*`,
+    headline,
     ...details,
     p.appUrl ? `\n<${p.appUrl}/tasks|Open Team PM>` : null,
   ]
