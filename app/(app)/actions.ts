@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
-import { notifyStatusChange, notifyTaskRaisedFromSlack } from "@/lib/slack";
+import { notifyStatusChange, notifyTaskRaisedFromSlack, notifyTaskDeleted } from "@/lib/slack";
 import { syncTaskCalendarEvent, deleteTaskCalendarEvent } from "@/lib/google";
 import { getMyAccess } from "@/lib/access";
 import type { MembershipRole } from "@/lib/access";
@@ -1026,7 +1026,7 @@ export async function deleteTask(taskId: string) {
   const me = await currentProfile();
   const { data: before } = await supabase
     .from("tasks")
-    .select("title, created_by, calendar_event_id, program")
+    .select("title, created_by, assignee_id, calendar_event_id, program, status, eta")
     .eq("id", taskId)
     .single();
 
@@ -1056,6 +1056,37 @@ export async function deleteTask(taskId: string) {
     },
     me
   );
+
+  // Tell the person who raised this task that someone else deleted it (typically
+  // the assignee deleting work assigned to them). Best-effort — the row is
+  // already gone, so a Slack hiccup must not surface as a failed delete.
+  if (before?.created_by && before.created_by !== me.id) {
+    try {
+      const admin = createAdminClient();
+      const ids = [before.created_by, before.assignee_id].filter(Boolean) as string[];
+      const { data: people } = await admin
+        .from("profiles")
+        .select("id, email, full_name")
+        .in("id", ids);
+      const creator = people?.find((x) => x.id === before.created_by);
+      const assignee = people?.find((x) => x.id === before.assignee_id);
+      if (creator?.email) {
+        await notifyTaskDeleted({
+          creatorEmail: creator.email,
+          taskTitle: before.title ?? "(untitled task)",
+          actorName: me.name,
+          actorIsAssignee: !!before.assignee_id && before.assignee_id === me.id,
+          assigneeName: assignee?.full_name ?? assignee?.email ?? null,
+          program: before.program ?? null,
+          status: before.status ?? null,
+          eta: before.eta ?? null,
+          appUrl: appUrl(),
+        });
+      }
+    } catch (e) {
+      console.error("Task-deleted DM failed:", e);
+    }
+  }
 
   revalidatePath("/board");
   revalidatePath("/tasks");
