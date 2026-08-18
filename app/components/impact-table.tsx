@@ -39,8 +39,8 @@ type ComputedSummary = {
   programs: ProgramSummary[];
 };
 
-const selCls = "max-w-full rounded-md border border-border bg-surface px-2 py-1 text-xs text-fg outline-none focus:border-accent";
-const inCls = "w-full rounded-md border border-border bg-surface px-2 py-1 text-xs text-fg outline-none focus:border-accent";
+const selCls = "w-full min-w-0 rounded-md border border-border bg-surface px-2 py-1 text-xs text-fg outline-none focus:border-accent";
+const inCls = "w-full min-w-0 rounded-md border border-border bg-surface px-2 py-1 text-xs text-fg outline-none focus:border-accent";
 const openCalendar = (e: React.MouseEvent<HTMLInputElement>) => (e.currentTarget as any).showPicker?.();
 
 type Edit = {
@@ -405,40 +405,43 @@ export function ImpactTable({
         </span>
       </div>
 
-      <div className="max-h-[70vh] overflow-y-auto rounded-xl border border-border bg-surface">
+      <div className="max-h-[70vh] overflow-y-auto overflow-x-hidden rounded-xl border border-border bg-surface">
         <table className="w-full table-fixed text-left text-xs">
           <colgroup>
+            {/* Widths measured against real content: the two selects need ~100px to
+                show "Non-Tangible" / "To be updated", and "Delivered" / "Last edited"
+                are sized by their own headers rather than their dates. */}
             <col className="w-[9%]" />{/* Name */}
             <col className="w-[12%]" />{/* Task */}
-            <col className="w-[11%]" />{/* Description */}
-            <col className="w-[6%]" />{/* Delivered */}
-            <col className="w-[8%]" />{/* Metric */}
-            <col className="w-[7%]" />{/* Type */}
-            <col className="w-[11%]" />{/* Pre value */}
-            <col className="w-[11%]" />{/* Post value */}
-            <col className="w-[12%]" />{/* Status */}
+            <col className="w-[9%]" />{/* Description */}
+            <col className="w-[8%]" />{/* Delivered */}
+            <col className="w-[7%]" />{/* Metric */}
+            <col className="w-[10%]" />{/* Type */}
+            <col className="w-[10%]" />{/* Pre value */}
+            <col className="w-[10%]" />{/* Post value */}
+            <col className="w-[10%]" />{/* Status */}
             <col className="w-[9%]" />{/* Last edited */}
-            <col className="w-[4%]" />{/* Save */}
+            <col className="w-[6%]" />{/* Save */}
           </colgroup>
           <thead className="sticky top-0 z-10 bg-surface-2 uppercase tracking-wide text-muted shadow-sm">
             <tr>
-              <th className="px-3 py-2.5 font-semibold">Name</th>
-              <th className="px-3 py-2.5 font-semibold">Task</th>
-              <th className="px-3 py-2.5 font-semibold">Description</th>
-              <th className="px-3 py-2.5 font-semibold">Delivered</th>
-              <th className="px-3 py-2.5 font-semibold">Metric</th>
-              <th className="px-3 py-2.5 font-semibold">Type</th>
-              <th className="px-3 py-2.5 font-semibold">Pre value</th>
-              <th className="px-3 py-2.5 font-semibold">Post value</th>
-              <th className="px-3 py-2.5 font-semibold">Status</th>
-              <th className="px-3 py-2.5 font-semibold">Last edited</th>
-              <th className="px-3 py-2.5"></th>
+              <th className="px-2.5 py-2.5 font-semibold">Name</th>
+              <th className="px-2.5 py-2.5 font-semibold">Task</th>
+              <th className="px-2.5 py-2.5 font-semibold">Description</th>
+              <th className="px-2.5 py-2.5 font-semibold">Delivered</th>
+              <th className="px-2.5 py-2.5 font-semibold">Metric</th>
+              <th className="px-2.5 py-2.5 font-semibold">Type</th>
+              <th className="px-2.5 py-2.5 font-semibold">Pre value</th>
+              <th className="px-2.5 py-2.5 font-semibold">Post value</th>
+              <th className="px-2.5 py-2.5 font-semibold">Status</th>
+              <th className="px-2.5 py-2.5 font-semibold">Last edited</th>
+              <th className="px-2.5 py-2.5"></th>
             </tr>
           </thead>
           <tbody>
             {visible.length === 0 && (
               <tr>
-                <td colSpan={11} className="px-3 py-10 text-center text-muted">
+                <td colSpan={11} className="px-2.5 py-10 text-center text-muted">
                   No completed tasks with metrics match these filters.
                 </td>
               </tr>
@@ -456,10 +459,10 @@ export function ImpactTable({
                 <tr key={key} className={`align-top ${zebra} ${rowBorder}`}>
                   {i === 0 && (
                     <>
-                      <td rowSpan={group.length} className="px-3 py-2 font-medium text-fg/80">
+                      <td rowSpan={group.length} className="px-2.5 py-2 font-medium text-fg/80 [overflow-wrap:anywhere]">
                         <div>{r.assignee ?? "—"}</div>
                         {(r.slackLink || r.sheetLink) && (
-                          <div className="mt-1.5 flex items-center gap-3">
+                          <div className="mt-1.5 flex items-center gap-2">
                             {r.slackLink && (
                               <a
                                 href={r.slackLink}
@@ -483,7 +486,7 @@ export function ImpactTable({
                           </div>
                         )}
                       </td>
-                      <td rowSpan={group.length} className="px-3 py-2 font-semibold text-fg">
+                      <td rowSpan={group.length} className="px-2.5 py-2 font-semibold text-fg [overflow-wrap:anywhere]">
                         <Link
                           href={`/board?task=${r.taskId}`}
                           title="Open this task on the Board"
@@ -492,7 +495,7 @@ export function ImpactTable({
                           {r.taskTitle}
                         </Link>
                       </td>
-                      <td rowSpan={group.length} className="max-w-[150px] px-3 py-2 text-muted">
+                      <td rowSpan={group.length} className="px-2.5 py-2 text-muted [overflow-wrap:anywhere]">
                         {r.description ? (
                           <div className="group relative">
                             <div className="line-clamp-3 cursor-default">{r.description}</div>
@@ -504,15 +507,15 @@ export function ImpactTable({
                           "—"
                         )}
                       </td>
-                      <td rowSpan={group.length} className="whitespace-nowrap px-3 py-2 text-muted">
+                      <td rowSpan={group.length} className="whitespace-nowrap px-2.5 py-2 text-muted">
                         {fmtDate(r.deliveredDate)}
                       </td>
                     </>
                   )}
-                  <td className="px-3 py-2 font-medium text-fg/80">{r.metric}</td>
+                  <td className="px-2.5 py-2 font-medium text-fg/80 [overflow-wrap:anywhere]">{r.metric}</td>
 
                   {/* Metric type */}
-                  <td className="px-3 py-2">
+                  <td className="px-2.5 py-2">
                     {editable ? (
                       <select value={e.metricType} onChange={(ev) => setField(key, "metricType", ev.target.value)} className={selCls}>
                         <option value="">—</option>
@@ -526,7 +529,7 @@ export function ImpactTable({
                   </td>
 
                   {/* Pre value */}
-                  <td className="px-3 py-2">
+                  <td className="px-2.5 py-2">
                     <ValueCell
                       side="pre"
                       rowKey={key}
@@ -541,7 +544,7 @@ export function ImpactTable({
                   </td>
 
                   {/* Post value */}
-                  <td className="px-3 py-2">
+                  <td className="px-2.5 py-2">
                     <ValueCell
                       side="post"
                       rowKey={key}
@@ -556,7 +559,7 @@ export function ImpactTable({
                   </td>
 
                   {/* Status — locked to "To be updated" until a post value exists. */}
-                  <td className="px-3 py-2">
+                  <td className="px-2.5 py-2">
                     {editable ? (
                       <select
                         value={hasPost ? e.status : "To be updated"}
@@ -579,13 +582,13 @@ export function ImpactTable({
                   </td>
 
                   {/* Last edited */}
-                  <td className="whitespace-nowrap px-3 py-2 text-[11px] text-muted">
+                  <td className="whitespace-nowrap px-2.5 py-2 text-[11px] text-muted">
                     <div>Pre {fmtDate(dates[key]?.pre ?? null)}</div>
                     <div>Post {fmtDate(dates[key]?.post ?? null)}</div>
                   </td>
 
                   {/* Save */}
-                  <td className="px-3 py-2">
+                  <td className="px-2.5 py-2">
                     {editable && dirty(key) && (
                       <button
                         type="button"
@@ -655,7 +658,7 @@ export function ImpactTable({
                 </div>
               ) : aiError ? (
                 <div className="space-y-4">
-                  <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
+                  <div className="rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-2 text-xs text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
                     Couldn&apos;t generate the AI summary ({aiError}) — showing a basic breakdown instead.
                   </div>
                   <SummaryBody summary={summary} />
@@ -731,7 +734,8 @@ export function ImpactTable({
   );
 }
 
-// A pre/post cell: label + value inputs, with an ⓘ popover for the description.
+// A pre/post cell: label and value stacked so each input gets the full column
+// width (side by side they were ~48px and you couldn't read what you typed).
 function ValueCell({
   side,
   rowKey,
@@ -755,46 +759,74 @@ function ValueCell({
 }) {
   const noteKey = `${rowKey}:${side}`;
   const isOpen = openNote === noteKey;
+  const sideName = side === "pre" ? "Pre" : "Post";
+  // Anchor pop-ups inward so the right-hand column can't push them out of view.
+  const anchor = side === "post" ? "right-0" : "left-0";
 
-  return (
-    <div className="relative min-w-[110px]">
-      <div className="flex items-center gap-1">
-        {editable ? (
-          <>
-            <input value={label} onChange={(e) => onChange("label", e.target.value)} placeholder="Avg…" className={`${inCls} w-12`} />
-            <span className="text-muted">:</span>
-            <input value={value} onChange={(e) => onChange("value", e.target.value)} placeholder="4.7" className={`${inCls} w-12`} />
-          </>
-        ) : (
-          <span className="text-fg/80">{label || value ? `${label || "—"}: ${value || "—"}` : "—"}</span>
-        )}
-        {(editable || desc) && (
-          <span className="group relative flex">
-            <button
-              type="button"
-              onClick={() => setOpenNote(isOpen ? null : noteKey)}
-              title={desc ? undefined : "Add a note"}
-              className={`grid h-5 w-5 shrink-0 place-items-center rounded ${desc ? "text-accent" : "text-muted"} hover:bg-surface-2`}
-            >
-              {desc ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src="/done.png" alt="Note added" className="h-3.5 w-3.5 object-contain dark:brightness-0 dark:invert" />
-              ) : (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src="/sticky-note.png" alt="Add note" className="h-3.5 w-3.5 object-contain" />
-              )}
-            </button>
-            {/* Hover preview of the note (click still opens the editable popover). */}
-            {desc && !isOpen && (
-              <span className="pointer-events-none absolute left-0 top-6 z-30 hidden w-56 whitespace-pre-line rounded-md border border-border bg-surface p-2 text-[11px] leading-relaxed text-fg/80 shadow-lg group-hover:block">
-                {desc}
-              </span>
-            )}
+  const noteButton =
+    editable || desc ? (
+      <span className="group relative flex shrink-0">
+        <button
+          type="button"
+          onClick={() => setOpenNote(isOpen ? null : noteKey)}
+          title={desc ? undefined : "Add a note"}
+          className={`grid h-6 w-6 shrink-0 place-items-center rounded ${desc ? "text-accent" : "text-muted"} hover:bg-surface-2`}
+        >
+          {desc ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src="/done.png" alt="Note added" className="h-3.5 w-3.5 object-contain dark:brightness-0 dark:invert" />
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src="/sticky-note.png" alt="Add note" className="h-3.5 w-3.5 object-contain" />
+          )}
+        </button>
+        {/* Hover preview of the note (click still opens the editable popover). */}
+        {desc && !isOpen && (
+          <span
+            className={`pointer-events-none absolute ${anchor} top-7 z-30 hidden w-56 whitespace-pre-line rounded-md border border-border bg-surface p-2 text-[11px] leading-relaxed text-fg/80 shadow-lg group-hover:block`}
+          >
+            {desc}
           </span>
         )}
-      </div>
+      </span>
+    ) : null;
+
+  return (
+    <div className="relative">
+      {editable ? (
+        <div className="flex flex-col gap-1">
+          {/* Label gets the full column (they run long: "Lead conversion"); the note
+              button rides with the value, which is usually just a number. */}
+          <input
+            value={label}
+            onChange={(e) => onChange("label", e.target.value)}
+            placeholder="e.g. Avg"
+            title={label || undefined}
+            aria-label={`${sideName} value label`}
+            className={inCls}
+          />
+          <div className="flex items-center gap-1">
+            <input
+              value={value}
+              onChange={(e) => onChange("value", e.target.value)}
+              placeholder="e.g. 4.7"
+              title={value || undefined}
+              aria-label={`${sideName} value`}
+              className={`${inCls} flex-1`}
+            />
+            {noteButton}
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-start gap-1">
+          <span className="min-w-0 [overflow-wrap:anywhere] text-fg/80">
+            {label || value ? `${label || "—"}: ${value || "—"}` : "—"}
+          </span>
+          {noteButton}
+        </div>
+      )}
       {isOpen && (
-        <div className="absolute left-0 z-20 mt-1 w-64 rounded-lg border border-border bg-surface p-2 shadow-lg">
+        <div className={`absolute ${anchor} z-20 mt-1 w-64 rounded-lg border border-border bg-surface p-2 shadow-lg`}>
           {editable ? (
             <textarea
               value={desc}
